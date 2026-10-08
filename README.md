@@ -1,11 +1,11 @@
 # GDGoC SVEC 4.O Hiring
 
-[![Live Site](https://img.shields.io/badge/Live%20Site-gdgoc--svec--hiring.vercel.app-blue?style=for-the-badge&logo=vercel)](https://gdgoc-svec-hiring.vercel.app/)
+[![Live Site](https://img.shields.io/badge/Live%20Site-gdg--hiring--4--0.vercel.app-blue?style=for-the-badge&logo=vercel)](https://gdg-hiring-4-0.vercel.app/)
 [![Created By](https://img.shields.io/badge/Developed%20By-Rameez--raza9-black?style=for-the-badge&logo=github)](https://github.com/Rameez-raza9)
 
 Official recruitment portal for **Google Developer Groups On Campus (GDGoC) SVEC 4.0**.
 
-🌐 **Live Application:** [https://gdgoc-svec-hiring.vercel.app/](https://gdgoc-svec-hiring.vercel.app/)
+🌐 **Live Application:** [https://gdg-hiring-4-0.vercel.app/](https://gdg-hiring-4-0.vercel.app/)
 
 ---
 
