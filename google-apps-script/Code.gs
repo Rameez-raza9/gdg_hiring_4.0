@@ -13,6 +13,18 @@ const HEADERS = [
   'Previous Event Experience', 'Accuracy Confirmed',
 ]
 
+function doGet(e) {
+  return ContentService.createTextOutput('GDGoC SVEC 4.0 Form API is active and connected to Rameez sheet.')
+}
+
+function testAuth() {
+  const spreadsheetId = '105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4'
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+  const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME)
+  ensureHeaders(sheet)
+  Logger.log('SUCCESS! Connected to spreadsheet: ' + spreadsheet.getName() + ' (' + spreadsheetId + ')')
+}
+
 function doPost(event) {
   const lock = LockService.getScriptLock()
   let requestId = ''
