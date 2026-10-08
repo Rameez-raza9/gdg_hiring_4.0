@@ -35,24 +35,186 @@ function onOpen() {
 
 /**
  * Web App GET endpoint
+ * Returns applications and existing reviews as JSON (or JSONP if callback is specified)
  */
 function doGet(e) {
-  return ContentService.createTextOutput('GDGoC SVEC 4.0 Form API is active and connected.')
-    .setMimeType(ContentService.MimeType.TEXT);
+  const action = (e && e.parameter && e.parameter.action) || 'getApplications';
+  const callback = e && e.parameter && e.parameter.callback;
+
+  if (action === 'health') {
+    return ContentService.createTextOutput('GDGoC SVEC 4.0 Form API is active and connected.')
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  try {
+    const spreadsheet = getSpreadsheet();
+    const appSheet = spreadsheet.getSheetByName(SHEET_NAME);
+    const reviewedSheet = spreadsheet.getSheetByName(RESULTS_SHEET_NAME);
+
+    const applications = [];
+    if (appSheet && appSheet.getLastRow() > 1) {
+      const numRows = appSheet.getLastRow() - 1;
+      const numCols = Math.min(appSheet.getLastColumn(), HEADERS.length);
+      const data = appSheet.getRange(2, 1, numRows, numCols).getValues();
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        let wingSpecificList = [];
+        try {
+          wingSpecificList = typeof row[17] === 'string' && row[17].startsWith('[') ? JSON.parse(row[17]) : row[17];
+        } catch (err) {
+          wingSpecificList = [row[17]];
+        }
+
+        applications.push({
+          rowIndex: i + 1,
+          submittedAt: row[0] ? (row[0] instanceof Date ? row[0].toISOString() : String(row[0])) : '',
+          applicationId: row[1] || ('APP-' + (i + 1)),
+          name: String(row[2] || ''),
+          rollNumber: String(row[3] || ''),
+          email: String(row[4] || ''),
+          phone: String(row[5] || ''),
+          year: String(row[6] || ''),
+          branch: String(row[7] || ''),
+          section: String(row[8] || ''),
+          domain: String(row[9] || ''),
+          wing: String(row[10] || ''),
+          prerequisiteConfirmation: String(row[11] || ''),
+          whyGDG: String(row[12] || ''),
+          whyWing: String(row[13] || ''),
+          experienceLevel: String(row[14] || ''),
+          hasProjects: String(row[15] || ''),
+          projectDescription: String(row[16] || ''),
+          wingSpecific: wingSpecificList,
+          wingSpecificText: String(row[18] || ''),
+          wingSpecificYes: String(row[19] || ''),
+          confirmed: row[20] === 'Yes' || row[20] === true
+        });
+      }
+    }
+
+    const reviews = [];
+    if (reviewedSheet && reviewedSheet.getLastRow() > 1) {
+      const rRows = reviewedSheet.getLastRow() - 1;
+      const rCols = Math.min(reviewedSheet.getLastColumn(), REVIEWED_HEADERS.length);
+      const rData = reviewedSheet.getRange(2, 1, rRows, rCols).getValues();
+
+      for (let j = 0; j < rData.length; j++) {
+        const r = rData[j];
+        reviews.push({
+          reviewedAt: r[0] ? (r[0] instanceof Date ? r[0].toISOString() : String(r[0])) : '',
+          reviewerName: String(r[1] || ''),
+          attendance: String(r[2] || ''),
+          decision: String(r[3] || ''),
+          techRating: r[4] || '',
+          commRating: r[5] || '',
+          passionRating: r[6] || '',
+          feedback: String(r[7] || ''),
+          applicationId: String(r[8] || ''),
+          name: String(r[9] || ''),
+          rollNumber: String(r[10] || ''),
+          year: String(r[11] || ''),
+          branch: String(r[12] || ''),
+          section: String(r[13] || ''),
+          domain: String(r[14] || ''),
+          wing: String(r[15] || '')
+        });
+      }
+    }
+
+    const responsePayload = {
+      ok: true,
+      count: applications.length,
+      applications: applications,
+      reviews: reviews,
+      timestamp: new Date().toISOString()
+    };
+
+    if (callback) {
+      return ContentService.createTextOutput(callback + '(' + JSON.stringify(responsePayload) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(responsePayload))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    const errorPayload = { ok: false, error: String(error) };
+    if (callback) {
+      return ContentService.createTextOutput(callback + '(' + JSON.stringify(errorPayload) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(JSON.stringify(errorPayload))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 /**
- * Web App POST endpoint - Submissions from website
+ * Web App POST endpoint - Submissions and Interview Reviews
  */
 function doPost(event) {
   const lock = LockService.getScriptLock();
   let requestId = '';
   try {
-    const application = JSON.parse(event.parameter.payload);
-    requestId = String(application.requestId || '');
+    const payload = JSON.parse(event.parameter.payload);
+    requestId = String(payload.requestId || '');
     lock.waitLock(10000);
 
     const spreadsheet = getSpreadsheet();
+
+    // Check if this is an interview review submission
+    if (payload.action === 'saveReview' || payload.type === 'interviewReview') {
+      let reviewedSheet = spreadsheet.getSheetByName(RESULTS_SHEET_NAME);
+      if (!reviewedSheet) {
+        reviewedSheet = spreadsheet.insertSheet(RESULTS_SHEET_NAME);
+      }
+
+      if (reviewedSheet.getLastRow() === 0) {
+        reviewedSheet.appendRow(REVIEWED_HEADERS);
+        reviewedSheet.setFrozenRows(1);
+        reviewedSheet.getRange(1, 1, 1, REVIEWED_HEADERS.length)
+          .setBackground('#1a73e8')
+          .setFontColor('#ffffff')
+          .setFontWeight('bold');
+      }
+
+      const reviewRow = [
+        new Date(),
+        payload.reviewerName || 'Reviewer',
+        payload.attendance || 'Attended',
+        payload.decision || 'Selected',
+        payload.techRating || '',
+        payload.commRating || '',
+        payload.passionRating || '',
+        payload.feedback || '',
+        payload.applicationId || '',
+        payload.name || '',
+        payload.rollNumber || '',
+        payload.year || '',
+        payload.branch || '',
+        payload.section || '',
+        payload.domain || '',
+        payload.wing || '',
+        payload.email || '',
+        payload.phone || '',
+        payload.whyGDG || '',
+        payload.whyWing || '',
+        payload.projectDescription || ''
+      ];
+
+      reviewedSheet.appendRow(reviewRow);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: true,
+        action: 'saveReview',
+        sheet: RESULTS_SHEET_NAME,
+        applicationId: payload.applicationId,
+        requestId: requestId,
+        message: 'Interview review saved to ' + RESULTS_SHEET_NAME
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Default: New Candidate Application Submission
+    const application = payload;
     const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME);
     
     if (sheet.getLastRow() === 0) {
