@@ -91,9 +91,43 @@ After changing `google-apps-script/Code.gs`, update the existing Apps Script dep
 
 Google's [versioning guide](https://developers.google.com/apps-script/guides/versions) confirms that editing an existing deployment to use a new version updates its code while retaining its deployment URL.
 
+## 6. Interviewer & Admin Portal Setup
+
+The web application includes an **Admin & Interview Evaluation Portal** designed for interviewers to review applicants during interviews and save evaluations to a new sheet:
+
+1. **How to open the portal**:
+   - Click the **"Interviewer Portal"** button in the top-right header of the website, or navigate directly to `/#admin` (e.g. `http://localhost:5173/#admin` or `https://your-app.vercel.app/#admin`).
+2. **Features**:
+   - **Real-time Search**: Search candidates instantly by name, roll number, email, branch, or wing.
+   - **Filters**: Filter by Domain (Tech / Non-Tech), Wing (Web, Mobile, AI/ML, Cloud, etc.), and Review Status (All / Pending / Reviewed).
+   - **Application Inspection**: Click any candidate to review their full profile: Why GDG, Why Wing, Experience level, Projects & descriptions, contact details (with quick mail/call/WhatsApp links).
+   - **Evaluation & Scoring Form**:
+     - Reviewer Name (automatically remembered in your browser).
+     - Attendance Status (`Attended`, `Absent`, `Rescheduled`).
+     - Ratings from 1 to 5 for:
+       - Technical Knowledge & Problem Solving
+       - Communication & Articulation
+       - Passion & Community Fit
+       - Cumulative average score calculation.
+     - Final Recommendation (`Selected`, `Shortlisted`, `Waitlisted`, `Rejected`).
+     - Detailed Interview Notes & Feedback.
+   - **Save to New Sheet**:
+     - Clicking **"Save Review to New Sheet"** submits the evaluation to Google Sheets, where it is automatically appended to the **`Reviewed_Candidates`** sheet!
+     - The candidate is immediately marked with a green checkmark and their decision badge in the directory.
+   - **CSV Export**: Click **"Export CSV"** in the top bar to download all applicant reviews locally.
+
+### Updating Apps Script to enable live sheet sync:
+
+1. In your Google Sheet, open **Extensions > Apps Script**.
+2. Replace `Code.gs` with the updated code in [`google-apps-script/Code.gs`](google-apps-script/Code.gs).
+3. Click **Deploy > Manage deployments > Edit (pencil icon)**.
+4. Set **Version** to **New version**, and click **Deploy**.
+5. The `Reviewed_Candidates` sheet will automatically be created with formatted headers (`Reviewed At`, `Reviewer Name`, `Attendance Status`, `Final Decision`, `Ratings`, `Interview Notes`, `Candidate Profile`, etc.) the first time a review is saved!
+
 ## Data and access notes
 
 - The Apps Script creates an `Applications` tab and appends one application per row. It validates required fields, email, phone, and response lengths server-side.
+- The Apps Script creates a `Reviewed_Candidates` tab and stores interview scores, recommendations, and feedback per candidate.
 - The Sheet stays private to its collaborators. The `/exec` URL is a public submission endpoint because applicants must be able to submit without logging in; do not treat it as a password or use it to read Sheet data.
 - Never put Google passwords, service-account credentials, or other private keys in the frontend or in a `VITE_` variable.
 - If `VITE_GOOGLE_SHEETS_WEB_APP_URL` is unset, the site uses localStorage and labels the result as a local preview. Those submissions do not go to Google Sheets.
@@ -101,3 +135,4 @@ Google's [versioning guide](https://developers.google.com/apps-script/guides/ver
 ## Download applications as an Excel workbook
 
 Applications are stored in the private Google Sheet and new rows appear there as applicants submit. To create an Excel copy, open the Sheet and choose **File > Download > Microsoft Excel (.xlsx)**. This downloads a snapshot; later submissions continue to appear in Google Sheets, so download again when you need an updated Excel file. Keep the downloaded workbook private because it contains applicant personal information.
+
