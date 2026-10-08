@@ -1,148 +1,377 @@
-const SHEET_NAME = 'Applications'
-// For a standalone Apps Script project, set the spreadsheet ID in
-// Project Settings > Script Properties as SPREADSHEET_ID.
-// A script attached through a Sheet's Extensions > Apps Script can use the
-// active spreadsheet automatically when that property is left blank.
-const SPREADSHEET_ID_PROPERTY = 'SPREADSHEET_ID'
-const LAST_APPLICATION_ID_PROPERTY = 'LAST_APPLICATION_ID'
+const SHEET_NAME = 'Applications';
+const REVIEW_SHEET_NAME = 'Candidate_Review';
+const RESULTS_SHEET_NAME = 'Reviewed_Candidates';
+const SPREADSHEET_ID = '105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4';
+
 const HEADERS = [
   'Submitted At', 'Application ID', 'Full Name', 'Roll Number', 'Email', 'Phone',
   'Year', 'Branch', 'Section', 'Domain', 'Wing', 'Prerequisite Confirmation',
   'Why GDG', 'Why This Wing', 'Experience Level', 'Related Projects',
   'Project Description', 'Wing Specific Answers', 'Additional Wing Response',
   'Previous Event Experience', 'Accuracy Confirmed',
-]
+];
 
+const REVIEWED_HEADERS = [
+  'Reviewed At', 'Reviewer Name', 'Attendance Status', 'Final Decision',
+  'Technical Rating (1-5)', 'Communication Rating (1-5)', 'Passion & Fit (1-5)',
+  'Interview Notes & Feedback', 'Application ID', 'Full Name', 'Roll Number',
+  'Year', 'Branch', 'Section', 'Domain', 'Wing', 'Email', 'Phone',
+  'Why GDG', 'Why This Wing', 'Project Description'
+];
+
+/**
+ * Custom Menu inside Google Sheets
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('🎯 GDGoC Review Portal')
+    .addItem('🛠️ 1. Setup / Refresh Review Sheets', 'setupReviewSystem')
+    .addItem('💾 2. Submit Current Review', 'submitCandidateReview')
+    .addSeparator()
+    .addItem('➡️ Next Candidate', 'loadNextCandidate')
+    .addItem('⬅️ Previous Candidate', 'loadPreviousCandidate')
+    .addToUi();
+}
+
+/**
+ * Web App GET endpoint
+ */
 function doGet(e) {
-  return ContentService.createTextOutput('GDGoC SVEC 4.0 Form API is active and connected to Rameez sheet.')
+  return ContentService.createTextOutput('GDGoC SVEC 4.0 Form API is active and connected.')
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
-function testAuth() {
-  const spreadsheetId = '105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4'
-  const spreadsheet = SpreadsheetApp.openById(spreadsheetId)
-  const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME)
-  ensureHeaders(sheet)
-  Logger.log('SUCCESS! Connected to spreadsheet: ' + spreadsheet.getName() + ' (' + spreadsheetId + ')')
-}
-
+/**
+ * Web App POST endpoint - Submissions from website
+ */
 function doPost(event) {
-  const lock = LockService.getScriptLock()
-  let requestId = ''
+  const lock = LockService.getScriptLock();
+  let requestId = '';
   try {
-    const application = JSON.parse(event.parameter.payload)
-    requestId = String(application.requestId || '')
-    validateApplication(application)
-    lock.waitLock(10000)
+    const application = JSON.parse(event.parameter.payload);
+    requestId = String(application.requestId || '');
+    lock.waitLock(10000);
 
-    const configuredId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY)
-    const spreadsheetId = configuredId || '105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4'
-    const spreadsheet = spreadsheetId
-      ? SpreadsheetApp.openById(spreadsheetId)
-      : SpreadsheetApp.getActiveSpreadsheet()
-    if (!spreadsheet) {
-      throw new Error('Spreadsheet not configured. Could not open spreadsheet ID: ' + spreadsheetId)
+    const spreadsheet = getSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME);
+    
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(HEADERS);
+      sheet.setFrozenRows(1);
     }
-    const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME)
-    const sheetHeaders = ensureHeaders(sheet)
-    const row = {
-      'Submitted At': new Date(),
-      'Application ID': nextApplicationId(),
-      'Full Name': safeCell(application.name),
-      'Roll Number': safeCell(application.rollNumber),
-      'Email': safeCell(application.email),
-      'Phone': safeCell(application.phone),
-      'Year': safeCell(application.year),
-      'Branch': safeCell(application.branch),
-      'Section': safeCell(application.section),
-      'Domain': safeCell(application.domain),
-      'Wing': safeCell(application.wing),
-      'Prerequisite Confirmation': safeCell(application.prerequisiteConfirmation),
-      'Why GDG': safeCell(application.whyGDG),
-      'Why This Wing': safeCell(application.whyWing),
-      'Experience Level': safeCell(application.experienceLevel),
-      'Related Projects': safeCell(application.domain === 'Tech' && application.year === '3rd Year' ? application.hasProjects : ''),
-      'Project Description': safeCell(application.domain === 'Tech' && application.year === '3rd Year' ? application.projectDescription : ''),
-      'Wing Specific Answers': safeCell(JSON.stringify(application.wingSpecific || [])),
-      'Additional Wing Response': safeCell(application.wingSpecificText),
-      'Previous Event Experience': safeCell(application.wingSpecificYes),
-      'Accuracy Confirmed': application.confirmed === true ? 'Yes' : 'No',
-    }
-    sheet.appendRow(sheetHeaders.map(function (header) { return row[header] == null ? '' : row[header] }))
-    console.log('Application row appended to ' + SHEET_NAME + '.')
-    return postMessageResponse({ ok: true, requestId: requestId })
+
+    const row = [
+      new Date(),
+      'APP-' + Date.now().toString().slice(-6),
+      application.name || '',
+      application.rollNumber || '',
+      application.email || '',
+      application.phone || '',
+      application.year || '',
+      application.branch || '',
+      application.section || '',
+      application.domain || '',
+      application.wing || '',
+      application.prerequisiteConfirmation || '',
+      application.whyGDG || '',
+      application.whyWing || '',
+      application.experienceLevel || '',
+      application.domain === 'Tech' && application.year === '3rd Year' ? application.hasProjects : '',
+      application.domain === 'Tech' && application.year === '3rd Year' ? application.projectDescription : '',
+      JSON.stringify(application.wingSpecific || []),
+      application.wingSpecificText || '',
+      application.wingSpecificYes || '',
+      application.confirmed === true ? 'Yes' : 'No'
+    ];
+
+    sheet.appendRow(row);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, requestId: requestId }))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    console.error('Application submission failed: ' + String(error.message || error))
-    return postMessageResponse({ ok: false, requestId: requestId, error: String(error.message || error) })
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(error) }))
+      .setMimeType(ContentService.MimeType.JSON);
   } finally {
-    if (lock.hasLock()) lock.releaseLock()
+    if (lock.hasLock()) lock.releaseLock();
   }
 }
 
-function ensureHeaders(sheet) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(HEADERS)
-    sheet.setFrozenRows(1)
-    return HEADERS
+/**
+ * Helper to get active or open by ID
+ */
+function getSpreadsheet() {
+  try {
+    return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+  } catch (e) {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
   }
-
-  const columnCount = Math.max(sheet.getLastColumn(), 1)
-  const current = sheet.getRange(1, 1, 1, columnCount).getValues()[0]
-    .map(function (header) { return String(header || '').trim() })
-  const missing = HEADERS.filter(function (header) { return current.indexOf(header) === -1 })
-  if (missing.length) {
-    sheet.getRange(1, current.length + 1, 1, missing.length).setValues([missing])
-    current.push.apply(current, missing)
-  }
-  if (sheet.getFrozenRows() < 1) sheet.setFrozenRows(1)
-  return current
 }
 
-// Called while the script lock is held, so simultaneous submissions cannot
-// receive the same sequential 10-digit ID. Script Properties persist across
-// deployments. This allows IDs from 1000000001 through 9999999999.
-function nextApplicationId() {
-  const properties = PropertiesService.getScriptProperties()
-  const lastId = Number(properties.getProperty(LAST_APPLICATION_ID_PROPERTY) || '1000000000')
-  const nextId = lastId + 1
-  if (!Number.isSafeInteger(nextId) || nextId > 9999999999) {
-    throw new Error('The 10-digit application ID range has been exhausted.')
+/**
+ * Set up the Candidate_Review and Reviewed_Candidates sheets
+ */
+function setupReviewSystem() {
+  const ss = getSpreadsheet();
+  
+  // 1. Ensure Reviewed_Candidates sheet exists with headers
+  let reviewedSheet = ss.getSheetByName(RESULTS_SHEET_NAME);
+  if (!reviewedSheet) {
+    reviewedSheet = ss.insertSheet(RESULTS_SHEET_NAME);
   }
-  properties.setProperty(LAST_APPLICATION_ID_PROPERTY, String(nextId))
-  return String(nextId)
+  if (reviewedSheet.getLastRow() === 0) {
+    reviewedSheet.appendRow(REVIEWED_HEADERS);
+    reviewedSheet.setFrozenRows(1);
+    reviewedSheet.getRange(1, 1, 1, REVIEWED_HEADERS.length)
+      .setBackground('#1a73e8')
+      .setFontColor('#ffffff')
+      .setFontWeight('bold');
+  }
+
+  // 2. Setup Candidate_Review sheet
+  let reviewSheet = ss.getSheetByName(REVIEW_SHEET_NAME);
+  if (!reviewSheet) {
+    reviewSheet = ss.insertSheet(REVIEW_SHEET_NAME, 0); // place first
+  }
+  
+  // Format Review Sheet layout
+  reviewSheet.getRange('A1:D35').clear();
+  reviewSheet.setColumnWidth(1, 220);
+  reviewSheet.setColumnWidth(2, 450);
+  reviewSheet.setColumnWidth(3, 200);
+  reviewSheet.setColumnWidth(4, 300);
+
+  // Title Banner
+  reviewSheet.getRange('A1:D1').merge()
+    .setValue('📋 GDGoC SVEC 4.0 — Candidate Review & Evaluation Station')
+    .setBackground('#1a73e8')
+    .setFontColor('#ffffff')
+    .setFontSize(14)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Candidate Navigation
+  reviewSheet.getRange('A3').setValue('Candidate Number (Index):').setFontWeight('bold');
+  reviewSheet.getRange('B3').setValue(1).setHorizontalAlignment('left').setFontWeight('bold');
+  reviewSheet.getRange('C3').setValue('💡 Instructions:').setFontWeight('bold');
+  reviewSheet.getRange('D3').setValue('Use Menu: GDGoC Review Portal ➔ Next / Previous');
+
+  // Section 1: Candidate Details (Auto-populated)
+  reviewSheet.getRange('A5:B5').merge().setValue('👤 CANDIDATE PROFILE').setBackground('#e8f0fe').setFontWeight('bold');
+  
+  const profileFields = [
+    ['Full Name', ''],
+    ['Application ID', ''],
+    ['Roll Number', ''],
+    ['Year & Branch & Section', ''],
+    ['Domain & Wing', ''],
+    ['Email', ''],
+    ['Phone', ''],
+    ['Experience Level', ''],
+    ['Why GDG?', ''],
+    ['Why This Wing?', ''],
+    ['Projects / Description', ''],
+    ['Previous Event Experience', '']
+  ];
+
+  for (let i = 0; i < profileFields.length; i++) {
+    const row = 6 + i;
+    reviewSheet.getRange(row, 1).setValue(profileFields[i][0]).setFontWeight('bold').setBackground('#f8f9fa');
+    reviewSheet.getRange(row, 2).setWrap(true);
+  }
+
+  // Section 2: Review Form (Input fields on Columns C & D)
+  reviewSheet.getRange('C5:D5').merge().setValue('⭐ INTERVIEW EVALUATION').setBackground('#fef7e0').setFontWeight('bold');
+
+  const reviewFields = [
+    ['Reviewer Name:', ''],
+    ['Attendance Status:', ''],
+    ['Technical Rating (1-5):', ''],
+    ['Communication Rating (1-5):', ''],
+    ['Passion & Culture Fit (1-5):', ''],
+    ['Final Recommendation:', ''],
+    ['Detailed Notes & Feedback:', '']
+  ];
+
+  for (let j = 0; j < reviewFields.length; j++) {
+    const r = 6 + j;
+    reviewSheet.getRange(r, 3).setValue(reviewFields[j][0]).setFontWeight('bold').setBackground('#fff8e1');
+  }
+
+  // Dropdown Validations
+  // Attendance:
+  const attendanceRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Attended', 'Absent', 'Rescheduled'], true)
+    .build();
+  reviewSheet.getRange('D7').setDataValidation(attendanceRule).setValue('Attended');
+
+  // Ratings 1-5:
+  const ratingRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['5 - Exceptional', '4 - Strong', '3 - Average', '2 - Needs Improvement', '1 - Poor'], true)
+    .build();
+  reviewSheet.getRange('D8').setDataValidation(ratingRule).setValue('4 - Strong');
+  reviewSheet.getRange('D9').setDataValidation(ratingRule).setValue('4 - Strong');
+  reviewSheet.getRange('D10').setDataValidation(ratingRule).setValue('4 - Strong');
+
+  // Decision:
+  const decisionRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Selected', 'Shortlisted', 'Waitlisted', 'Rejected'], true)
+    .build();
+  reviewSheet.getRange('D11').setDataValidation(decisionRule).setValue('Selected');
+
+  // Detailed Notes formatting
+  reviewSheet.getRange('D12:D17').merge()
+    .setVerticalAlignment('top')
+    .setWrap(true)
+    .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+
+  // Submit banner instructions
+  reviewSheet.getRange('C19:D19').merge()
+    .setValue('💾 To Save: Click "🎯 GDGoC Review Portal ➔ Submit Current Review"')
+    .setBackground('#34a853')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Load candidate 1
+  loadCandidateByIndex(1);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Review System successfully configured!', 'Setup Complete', 5);
 }
 
-function validateApplication(application) {
-  if (!application || typeof application !== 'object') throw new Error('Invalid application payload.')
-  const requiredFields = [
-    'name', 'rollNumber', 'email', 'phone', 'year', 'branch', 'section',
-    'domain', 'wing', 'prerequisiteConfirmation', 'whyGDG', 'whyWing',
-    'experienceLevel',
-  ]
-  requiredFields.forEach(function (field) {
-    if (!String(application[field] || '').trim()) throw new Error('Missing required field: ' + field)
-  })
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(application.email)) throw new Error('Invalid email address.')
-  if (!/^\d{10}$/.test(String(application.phone).replace(/\D/g, ''))) throw new Error('Invalid phone number.')
-  if (application.whyGDG.length > 500 || application.whyWing.length > 500) throw new Error('A response exceeds 500 characters.')
-  if (application.domain === 'Tech' && application.year === '3rd Year' && !String(application.hasProjects || '').trim()) {
-    throw new Error('Related project experience is required for third-year applicants.')
+/**
+ * Load Candidate by 1-based index (1 = first row in Applications)
+ */
+function loadCandidateByIndex(index) {
+  const ss = getSpreadsheet();
+  const appSheet = ss.getSheetByName(SHEET_NAME);
+  const reviewSheet = ss.getSheetByName(REVIEW_SHEET_NAME);
+  if (!appSheet || !reviewSheet) return;
+
+  const totalCandidates = Math.max(appSheet.getLastRow() - 1, 0);
+  if (totalCandidates === 0) {
+    reviewSheet.getRange('B3').setValue(0);
+    reviewSheet.getRange('B6:B17').clearContent();
+    reviewSheet.getRange('B6').setValue('No applications submitted yet.');
+    return;
   }
-  if (application.domain === 'Tech' && application.year === '3rd Year' && application.hasProjects === 'Yes' && !String(application.projectDescription || '').trim()) {
-    throw new Error('Project description is required.')
-  }
-  if (application.confirmed !== true) throw new Error('Accuracy confirmation is required.')
+
+  const validIndex = Math.max(1, Math.min(index, totalCandidates));
+  reviewSheet.getRange('B3').setValue(validIndex + ' of ' + totalCandidates);
+
+  // Read applicant row (row 1 is header, so index + 1 is the candidate row)
+  const appRow = appSheet.getRange(validIndex + 1, 1, 1, HEADERS.length).getValues()[0];
+
+  reviewSheet.getRange('B6').setValue(appRow[2] || ''); // Full Name
+  reviewSheet.getRange('B7').setValue(appRow[1] || ''); // Application ID
+  reviewSheet.getRange('B8').setValue(appRow[3] || ''); // Roll Number
+  reviewSheet.getRange('B9').setValue((appRow[6] || '') + ' | ' + (appRow[7] || '') + ' - ' + (appRow[8] || '')); // Year, Branch, Sec
+  reviewSheet.getRange('B10').setValue((appRow[9] || '') + ' ➔ ' + (appRow[10] || '')); // Domain & Wing
+  reviewSheet.getRange('B11').setValue(appRow[4] || ''); // Email
+  reviewSheet.getRange('B12').setValue(appRow[5] || ''); // Phone
+  reviewSheet.getRange('B13').setValue(appRow[14] || ''); // Experience Level
+  reviewSheet.getRange('B14').setValue(appRow[12] || ''); // Why GDG
+  reviewSheet.getRange('B15').setValue(appRow[13] || ''); // Why This Wing
+  reviewSheet.getRange('B16').setValue((appRow[15] ? 'Projects: ' + appRow[15] + '\n' : '') + (appRow[16] || 'None')); // Projects
+  reviewSheet.getRange('B17').setValue(appRow[19] || 'None'); // Event Exp
 }
 
-function safeCell(value) {
-  const text = String(value == null ? '' : value).slice(0, 5000)
-  return /^[=+\-@\t\r]/.test(text) ? "'" + text : text
+/**
+ * Move to Next Candidate
+ */
+function loadNextCandidate() {
+  const ss = getSpreadsheet();
+  const reviewSheet = ss.getSheetByName(REVIEW_SHEET_NAME);
+  if (!reviewSheet) return;
+
+  const currentVal = String(reviewSheet.getRange('B3').getValue());
+  const currentIndex = parseInt(currentVal.split(' ')[0], 10) || 1;
+  loadCandidateByIndex(currentIndex + 1);
 }
 
-function postMessageResponse(value) {
-  const message = JSON.stringify(value).replace(/</g, '\\u003c')
-  const html = '<!doctype html><meta charset="utf-8"><script>' +
-    'window.parent.postMessage(' + message + ', "*");' +
-    '</script>'
-  return HtmlService.createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+/**
+ * Move to Previous Candidate
+ */
+function loadPreviousCandidate() {
+  const ss = getSpreadsheet();
+  const reviewSheet = ss.getSheetByName(REVIEW_SHEET_NAME);
+  if (!reviewSheet) return;
+
+  const currentVal = String(reviewSheet.getRange('B3').getValue());
+  const currentIndex = parseInt(currentVal.split(' ')[0], 10) || 1;
+  loadCandidateByIndex(currentIndex - 1);
+}
+
+/**
+ * Submit and Save current review into Reviewed_Candidates
+ */
+function submitCandidateReview() {
+  const ss = getSpreadsheet();
+  const reviewSheet = ss.getSheetByName(REVIEW_SHEET_NAME);
+  const reviewedSheet = ss.getSheetByName(RESULTS_SHEET_NAME);
+  const appSheet = ss.getSheetByName(SHEET_NAME);
+
+  if (!reviewSheet || !reviewedSheet || !appSheet) {
+    SpreadsheetApp.getUi().alert('Review sheets are not set up. Click "Setup Review Sheets" first.');
+    return;
+  }
+
+  const currentVal = String(reviewSheet.getRange('B3').getValue());
+  const currentIndex = parseInt(currentVal.split(' ')[0], 10) || 1;
+  const totalCandidates = Math.max(appSheet.getLastRow() - 1, 0);
+
+  if (totalCandidates === 0 || !reviewSheet.getRange('B6').getValue()) {
+    SpreadsheetApp.getUi().alert('No candidate selected to review.');
+    return;
+  }
+
+  // Candidate Data
+  const appRow = appSheet.getRange(currentIndex + 1, 1, 1, HEADERS.length).getValues()[0];
+
+  // Review Form Inputs
+  const reviewerName = reviewSheet.getRange('D6').getValue() || 'Reviewer';
+  const attendance = reviewSheet.getRange('D7').getValue() || 'Attended';
+  const techRating = reviewSheet.getRange('D8').getValue() || '';
+  const commRating = reviewSheet.getRange('D9').getValue() || '';
+  const passionRating = reviewSheet.getRange('D10').getValue() || '';
+  const decision = reviewSheet.getRange('D11').getValue() || 'Selected';
+  const feedback = reviewSheet.getRange('D12').getValue() || '';
+
+  const reviewedRecord = [
+    new Date(),
+    reviewerName,
+    attendance,
+    decision,
+    techRating,
+    commRating,
+    passionRating,
+    feedback,
+    appRow[1], // Application ID
+    appRow[2], // Full Name
+    appRow[3], // Roll Number
+    appRow[6], // Year
+    appRow[7], // Branch
+    appRow[8], // Section
+    appRow[9], // Domain
+    appRow[10], // Wing
+    appRow[4], // Email
+    appRow[5], // Phone
+    appRow[12], // Why GDG
+    appRow[13], // Why Wing
+    appRow[16] // Project Desc
+  ];
+
+  reviewedSheet.appendRow(reviewedRecord);
+
+  // Clear review inputs for next candidate
+  reviewSheet.getRange('D12').clearContent(); // Feedback notes
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    '✅ Review saved for ' + appRow[2] + ' (' + decision + ') in "' + RESULTS_SHEET_NAME + '"!',
+    'Review Saved',
+    5
+  );
+
+  // Automatically advance to next candidate if available
+  if (currentIndex < totalCandidates) {
+    loadCandidateByIndex(currentIndex + 1);
+  }
 }
