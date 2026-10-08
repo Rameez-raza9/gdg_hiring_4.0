@@ -1,5 +1,8 @@
-const STORAGE_KEY = 'gdg-campus-applications'
-const SHEETS_ENDPOINT = import.meta.env.VITE_GOOGLE_SHEETS_WEB_APP_URL?.trim()
+const WORKING_SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwZHQERiP5UjIinfwGo7wwO-pCOf2R_l6wbd6eALnu-FLZwkEWLcBA6QYQ8wp51joHmYw/exec'
+const envEndpoint = import.meta.env.VITE_GOOGLE_SHEETS_WEB_APP_URL?.trim()
+const SHEETS_ENDPOINT = (envEndpoint && !envEndpoint.includes('AKfycbwENSX') && !envEndpoint.includes('AKfycbwFQVi'))
+  ? envEndpoint
+  : WORKING_SHEETS_ENDPOINT
 
 function saveLocally(application) {
   const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
