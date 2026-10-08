@@ -2,49 +2,39 @@
 
 This project is a Vite static website. **Vercel is the recommended host** for the quickest GitHub-connected deployment. Render also works; setup for both is below.
 
-## 1. Create the Google Sheet receiver
+## 1. Setup Apps Script in your Google Sheet
 
-1. Create a Google Sheet, for example **GDGoC SVEC 4.O Applications**. Keep its sharing permissions restricted to the hiring team.
-2. Open the Sheet and choose **Extensions > Apps Script**. This attaches the script to that Sheet. If you already created a standalone project from the Apps Script home page, you can keep it; use the spreadsheet ID setup below.
-3. Open [`google-apps-script/Code.gs`](google-apps-script/Code.gs) in this project, copy its full contents into the Apps Script editor, and save.
-4. For a standalone Apps Script project, open **Project Settings** (gear icon) > **Script Properties** > **Add script property**. Set the property name to `SPREADSHEET_ID`. Its value is the ID in the Sheet URL between `/d/` and `/edit`. Example: `https://docs.google.com/spreadsheets/d/1AbC...XyZ/edit` → ID is `1AbC...XyZ`. Save the property. Do not put this ID in the website's `.env` file.
-5. In Apps Script, choose **Deploy > New deployment**. Select **Web app** as the deployment type.
-6. Set **Execute as** to your Google account. Set access to **Anyone** so applicants can submit without signing in. The web app runs as you and writes to the Sheet; applicants do not get access to read the Sheet.
-7. Choose **Deploy**, complete Google's authorization prompt, then copy the deployed URL ending in `/exec`.
+1. Open your Google Sheet: [**GDGoC SVEC 4.0 Applications**](https://docs.google.com/spreadsheets/d/105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4/edit) while logged in to **`dynamicrameez0786@gmail.com`**.
+2. **Remove unwanted collaborators**: Click **Share** (top-right) and ensure only your account (`dynamicrameez0786@gmail.com`) has owner access. If any previous accounts (like Sidhi's email) are listed, remove them.
+3. Open **Extensions > Apps Script**.
+4. Replace the contents of `Code.gs` in the editor with the complete contents of [`google-apps-script/Code.gs`](google-apps-script/Code.gs) from this project.
+5. In Apps Script, choose **Deploy > New deployment**:
+   - Click the gear icon next to "Select type" and choose **Web app**.
+   - **Description:** `GDGoC SVEC 4.0 Hiring Form Handler`
+   - **Execute as:** `Me (dynamicrameez0786@gmail.com)`
+   - **Who has access:** `Anyone`
+6. Click **Deploy**, authorize the permissions using your Google account (`dynamicrameez0786@gmail.com`), and copy the deployed Web App URL (ending in `/exec`).
 
-Google's [Apps Script web app guide](https://developers.google.com/apps-script/guides/web) describes web app deployment and execution identity.
+## 2. Connect the URL to the Website
 
-## 2. Test locally first (optional)
-
-From the project folder, create `.env.local` by copying `.env.example`. Put your deployed URL on the right side of this line:
+In the project folder, open `.env.local` (and add to Vercel environment variables):
 
 ```text
-VITE_GOOGLE_SHEETS_WEB_APP_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+VITE_GOOGLE_SHEETS_WEB_APP_URL=https://script.google.com/macros/s/YOUR_NEW_DEPLOYMENT_ID/exec
 ```
 
-Then run:
+Then test locally:
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Submit one clearly marked test application. The script creates an `Applications` tab with headers when the first response arrives. Confirm the row appears in the Sheet before sharing the public site. The Apps Script **Executions** page should show a `doPost` execution; expand it and check **Cloud logs** for `Application row appended to Applications.` A `Completed` execution alone only means the handler returned; an error caught by the script can also appear as completed, so check the log and Sheet row.
+Submit a test application. The script will automatically create the `Applications` tab in your Google Sheet with all headers and append the row.
 
-## 3. Publish on Vercel (recommended)
+## 3. GitHub & Vercel Deployment
 
-### Push this project to GitHub
-
-Create an empty GitHub repository, then run these commands from the project folder. Replace `YOUR_GITHUB_USERNAME` with your account name:
-
-```powershell
-git init
-git add .
-git commit -m "Initial GDGoC SVEC hiring site"
-git branch -M main
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/gdgoc-svec-hiring.git
-git push -u origin main
-```
+Repository: [https://github.com/Rameez-raza9/gdg_hiring_4.0.git](https://github.com/Rameez-raza9/gdg_hiring_4.0.git)
 
 `.gitignore` excludes `node_modules`, `dist`, and local `.env` files, so the Apps Script URL in `.env.local` will not be pushed.
 

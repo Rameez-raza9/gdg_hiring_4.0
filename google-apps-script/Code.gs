@@ -22,12 +22,13 @@ function doPost(event) {
     validateApplication(application)
     lock.waitLock(10000)
 
-    const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY)
+    const configuredId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY)
+    const spreadsheetId = configuredId || '105h2_S65Uyv4uf40yxAA1fAt405cHbYq3-JMr7JsRp4'
     const spreadsheet = spreadsheetId
       ? SpreadsheetApp.openById(spreadsheetId)
       : SpreadsheetApp.getActiveSpreadsheet()
     if (!spreadsheet) {
-      throw new Error('Spreadsheet not configured. Set SPREADSHEET_ID in Apps Script project settings.')
+      throw new Error('Spreadsheet not configured. Could not open spreadsheet ID: ' + spreadsheetId)
     }
     const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME)
     const sheetHeaders = ensureHeaders(sheet)
