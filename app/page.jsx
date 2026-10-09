@@ -16,6 +16,7 @@ import { branches, getSections, sections, steps, wings, years, wingOptions } fro
 import { validateStep } from '@/utils/validation'
 import { submitApplication } from '@/services/applicationService'
 import { GDG_COMMUNITY_LINKS } from '@/services/mailService'
+import Feature28 from '@/components/shadcn-space/blocks/feature-28'
 
 const initial = {
   name: '', rollNumber: '', email: '', phone: '', year: '', branch: '',
@@ -398,6 +399,9 @@ export default function HomePage() {
               </div>
             </div>
           </section>
+
+          {/* Feature-28 Shadcn Block */}
+          <Feature28 />
 
           {/* Community Strip */}
           <div className="neo-community-strip">
