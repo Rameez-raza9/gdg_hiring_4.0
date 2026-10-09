@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     if (isAdmin) {
       await turso.execute({
-        sql: `UPDATE users SET role = 'Admin' WHERE LOWER(email) = 'vinaysiddha19@gmail.com'`,
+        sql: `UPDATE users SET role = 'Admin'`,
         args: [],
       });
     }
