@@ -1,65 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
-import AdminDashboard from "@/components/admin-dashboard/admin-dashboard";
-import AdminPortal from "@/components/AdminPortal";
-import { useRouter } from "next/navigation";
+import * as React from "react"
+import { AppSidebar } from "@/components/app-sidebar"
+import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { DataTable } from "@/components/data-table"
+import { SectionCards } from "@/components/section-cards"
+import { SiteHeader } from "@/components/site-header"
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
 
-export default function PortalPage() {
-  const router = useRouter();
-  const [viewMode, setViewMode] = useState("dashboard"); // "dashboard" | "recruitment"
+import data from "./data.json"
 
+export default function Page() {
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col">
-      {/* Top Floating Mini Switcher for previewing both Untitled UI Dashboard & Recruitment Operations */}
-      <div className="w-full bg-white border-b border-gray-200 px-6 py-2.5 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 text-gray-500 font-medium">
-          <button
-            onClick={() => router.push("/")}
-            className="hover:text-gray-900 transition-colors"
-          >
-            ← Back to Home
-          </button>
-          <span>•</span>
-          <span className="text-gray-900 font-semibold">Admin Panel</span>
-        </div>
-
-        <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setViewMode("dashboard")}
-            className={`px-3 py-1 rounded-md transition-all ${
-              viewMode === "dashboard"
-                ? "bg-white text-gray-900 font-semibold shadow-xs border border-gray-200/80"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            Dashboard UI (Screenshot)
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("recruitment")}
-            className={`px-3 py-1 rounded-md transition-all ${
-              viewMode === "recruitment"
-                ? "bg-white text-gray-900 font-semibold shadow-xs border border-gray-200/80"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            Recruitment Stations
-          </button>
-        </div>
-      </div>
-
-      {/* Render View */}
-      <div className="flex-1 w-full">
-        {viewMode === "dashboard" ? (
-          <AdminDashboard onBackToHome={() => router.push("/")} />
-        ) : (
-          <div className="max-w-[1400px] mx-auto p-4 sm:p-6">
-            <AdminPortal onBackToForm={() => setViewMode("dashboard")} />
+    <SidebarProvider
+      style={{
+        "--sidebar-width": "calc(var(--spacing) * 72)",
+        "--header-height": "calc(var(--spacing) * 12)",
+      }}
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              <SectionCards />
+              <div className="px-4 lg:px-6">
+                <ChartAreaInteractive />
+              </div>
+              <DataTable data={data} />
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
 }
