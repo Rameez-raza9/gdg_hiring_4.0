@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS applications (
   year TEXT,                                 -- Year of study (1, 2, 3, 4)
   tracks TEXT NOT NULL,                      -- JSON array of selected tracks: '["genai-aiml","web-app"]'
   why TEXT,                                  -- Statement of motivation / purpose
-  link TEXT,                                 -- Portfolio, GitHub, or LinkedIn URL
+  link TEXT,                                 -- Primary Portfolio, GitHub, or LinkedIn URL
+  other_clubs TEXT,                          -- JSON array of clubs student is part of (e.g. '["mmlsc svec","aws community clubs svec"]')
+  club_role TEXT,                            -- Role in other clubs ('Member' | 'Associate' | 'Lead')
+  extra_links TEXT,                          -- JSON array of additional links: '[{"type":"github","url":"..."},{"type":"portfolio","url":"..."}]'
   status TEXT DEFAULT 'New',                 -- 'New' | 'In review' | 'Shortlisted' | 'Interview' | 'Accepted' | 'Rejected'
   submitted TEXT NOT NULL,                   -- Submission date ISO string (YYYY-MM-DD)
   created_at TEXT DEFAULT (datetime('now'))  -- Record creation timestamp

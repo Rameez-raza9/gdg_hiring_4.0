@@ -3,17 +3,49 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Loader2, LogIn, AlertCircle } from "lucide-react";
+import { Check, Loader2, LogIn, AlertCircle, Plus, Trash2, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Dot, G } from "@/components/dot";
+import { G } from "@/lib/brand";
 import { TRACK_GROUPS } from "@/lib/brand";
 import { auth, signInWithGoogle } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { sfx } from "@/lib/audio";
+import {
+  Dot01, Dot02, Dot03, Dot04, Dot05, Dot06, Dot07, Dot08, Dot09, Dot10, Dot11, Dot12
+} from "@/components/AnimatedDots";
 
-const BRANCHES = ["CSE", "IT", "AI & DS", "ECE", "EEE", "Mechanical", "Civil", "Other"];
+const BRANCHES = [
+  "CSE",
+  "CSE-AI",
+  "AIML",
+  "IT",
+  "AI & DS",
+  "ECE",
+  "EEE",
+  "Mechanical",
+  "Civil",
+  "Other",
+];
+
 const YEARS = ["1st year", "2nd year", "3rd year", "4th year"];
-const STEPS = ["About you", "Your tracks", "Why join"];
+const STEPS = ["About you", "Your tracks", "Clubs & Links", "Why join"];
 const MAX_TRACKS = 3;
+
+const OTHER_CLUBS_LIST = [
+  "MMLSC SVEC",
+  "AWS Community Clubs SVEC",
+  "SVAN",
+  "TEDx Vasavi",
+  "Dance Club",
+  "Photography Club",
+];
+
+const CLUB_ROLES = ["Member", "Associate", "Lead"];
+
+export type ExtraLink = {
+  label: string;
+  url: string;
+};
 
 type Form = {
   name: string;
@@ -23,29 +55,98 @@ type Form = {
   branch: string;
   year: string;
   tracks: string[];
+  otherClubs: string[];
+  otherClubCustom: string;
+  clubRole: string;
+  github: string;
+  linkedin: string;
+  portfolio: string;
+  extraLinks: ExtraLink[];
   why: string;
   link: string;
 };
 
 const EMPTY: Form = {
-  name: "", email: "", phone: "", roll: "", branch: "", year: "",
-  tracks: [], why: "", link: "",
+  name: "",
+  email: "",
+  phone: "",
+  roll: "",
+  branch: "",
+  year: "",
+  tracks: [],
+  otherClubs: [],
+  otherClubCustom: "",
+  clubRole: "Member",
+  github: "",
+  linkedin: "",
+  portfolio: "",
+  extraLinks: [],
+  why: "",
+  link: "",
 };
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-2 focus:ring-foreground/10 text-foreground";
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function FieldHeaderDot({ dotIndex = 1 }: { dotIndex?: number }) {
+  const size = 32;
+  switch (dotIndex) {
+    case 1: return <Dot01 size={size} />;
+    case 2: return <Dot02 size={size} />;
+    case 3: return <Dot03 size={size} />;
+    case 4: return <Dot04 size={size} />;
+    case 5: return <Dot05 size={size} />;
+    case 6: return <Dot06 size={size} />;
+    case 7: return <Dot07 size={size} />;
+    case 8: return <Dot08 size={size} />;
+    case 9: return <Dot09 size={size} />;
+    case 10: return <Dot10 size={size} />;
+    case 11: return <Dot11 size={size} />;
+    case 12: return <Dot12 size={size} />;
+    default: return <Dot01 size={size} />;
+  }
+}
+
+function Field({
+  label,
+  error,
+  dotIndex,
+  tooltip,
+  children,
+}: {
+  label: string;
+  error?: string;
+  dotIndex?: number;
+  tooltip?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium">{label}</span>
+    <div className="block">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {dotIndex && (
+            <div className="flex shrink-0 items-center justify-center p-0.5 rounded-full bg-slate-50 border border-slate-200">
+              <FieldHeaderDot dotIndex={dotIndex} />
+            </div>
+          )}
+          <span className="text-sm font-semibold text-foreground tracking-tight">{label}</span>
+        </div>
+        {tooltip && (
+          <span className="group relative cursor-help text-xs text-muted-foreground">
+            <HelpCircle className="size-3.5 inline mr-1 text-slate-400" />
+            <span className="pointer-events-none absolute right-0 top-6 z-50 hidden w-48 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] text-white shadow-lg group-hover:block">
+              {tooltip}
+            </span>
+          </span>
+        )}
+      </div>
       {children}
       {error && (
-        <span role="alert" className="mt-1.5 block text-sm text-red-500 font-medium">
+        <span role="alert" className="mt-1.5 block text-xs text-red-500 font-medium">
           {error}
         </span>
       )}
-    </label>
+    </div>
   );
 }
 
@@ -100,6 +201,7 @@ export default function ApplyPage() {
       if (error || !user) {
         throw new Error(error || "Wait some time and try again.");
       }
+      sfx.playSuccess();
       setCurrentUser(user);
       setF((prev) => ({
         ...prev,
@@ -108,6 +210,7 @@ export default function ApplyPage() {
       }));
     } catch (err: unknown) {
       console.error("Google sign in error:", err);
+      sfx.playError();
       setAuthError("Failed to sign in. Wait some time and try again.");
     } finally {
       setGoogleLoading(false);
@@ -120,8 +223,46 @@ export default function ApplyPage() {
     setGeneralError("");
   };
 
+  const addExtraLink = () => {
+    sfx.playPop();
+    setF((p) => ({
+      ...p,
+      extraLinks: [...p.extraLinks, { label: "Project", url: "" }],
+    }));
+  };
+
+  const updateExtraLink = (idx: number, field: "label" | "url", val: string) => {
+    setF((p) => {
+      const next = [...p.extraLinks];
+      next[idx] = { ...next[idx], [field]: val };
+      return { ...p, extraLinks: next };
+    });
+  };
+
+  const removeExtraLink = (idx: number) => {
+    sfx.playPop();
+    setF((p) => ({
+      ...p,
+      extraLinks: p.extraLinks.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const toggleClub = (club: string) => {
+    sfx.playPop();
+    setF((p) => {
+      const exists = p.otherClubs.includes(club);
+      return {
+        ...p,
+        otherClubs: exists
+          ? p.otherClubs.filter((c) => c !== club)
+          : [...p.otherClubs, club],
+      };
+    });
+  };
+
   const validate = () => {
     const e: typeof errors = {};
+
     if (step === 0) {
       if (f.name.trim().length < 2) e.name = "Enter your full name.";
       if (!/^\S+@\S+\.\S+$/.test(f.email)) e.email = "Enter a valid college email.";
@@ -129,43 +270,81 @@ export default function ApplyPage() {
       if (!f.branch) e.branch = "Choose your branch.";
       if (!f.year) e.year = "Choose your year.";
     }
-    if (step === 1 && f.tracks.length === 0) e.tracks = "Pick at least one track.";
-    if (step === 2 && f.why.trim().length < 20) e.why = "Write at least a couple of sentences.";
+
+    if (step === 1) {
+      if (f.tracks.length === 0) e.tracks = "Pick at least one track.";
+    }
+
+    if (step === 2) {
+      if (!f.github.trim()) e.github = "GitHub profile link is mandatory.";
+      if (!f.linkedin.trim()) e.linkedin = "LinkedIn profile link is mandatory.";
+      if (!f.portfolio.trim()) e.portfolio = "Portfolio / project showcase link is mandatory.";
+    }
+
+    if (step === 3) {
+      if (f.why.trim().length < 20) e.why = "Write at least a couple of sentences on your motivation.";
+    }
+
     setErrors(e);
-    return Object.keys(e).length === 0;
+    const valid = Object.keys(e).length === 0;
+    if (valid) {
+      sfx.playSuccess();
+    } else {
+      sfx.playError();
+    }
+    return valid;
   };
 
   const next = async () => {
     if (!validate()) return;
-    if (step < 2) return setStep(step + 1);
+    if (step < 3) return setStep(step + 1);
 
+    // Final Submission
     setSending(true);
     setGeneralError("");
+
+    // Consolidate all clubs
+    const finalClubs = [...f.otherClubs];
+    if (f.otherClubCustom.trim()) {
+      finalClubs.push(f.otherClubCustom.trim());
+    }
+
+    const payload = {
+      ...f,
+      otherClubs: finalClubs,
+      link: f.portfolio || f.github || f.linkedin,
+    };
+
     try {
       const res = await fetch("/api/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok || data?.error) {
+        sfx.playError();
         setGeneralError(data?.error || "Wait some time and try again.");
         setSending(false);
         return;
       }
+      sfx.playSuccess();
       setSending(false);
       setDone(true);
     } catch (err) {
       console.error("Apply error:", err);
+      sfx.playError();
       setGeneralError("Wait some time and try again.");
       setSending(false);
     }
   };
 
   const toggleTrack = (t: string) => {
+    sfx.playPop();
     const has = f.tracks.includes(t);
     if (!has && f.tracks.length >= MAX_TRACKS) {
       setErrors((p) => ({ ...p, tracks: `You can pick up to ${MAX_TRACKS} tracks.` }));
+      sfx.playError();
       return;
     }
     set("tracks", has ? f.tracks.filter((x) => x !== t) : [...f.tracks, t]);
@@ -175,23 +354,32 @@ export default function ApplyPage() {
     <div className="dot-glow">
       <div className="dot-grid min-h-screen">
         <div className="mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-16 lg:grid-cols-[1fr_1.1fr] lg:pt-24">
-          {/* Left: copy + mascot */}
+          {/* Left: copy + official logo */}
           <div className="lg:sticky lg:top-24 lg:self-start">
+            <div className="flex items-center gap-3 mb-4">
+              <img
+                src="/assets/logos/main_logo.jpeg"
+                alt="GDGoC SVEC Logo"
+                className="size-11 rounded-xl object-contain border border-border shadow-sm"
+              />
+              <span className="font-bold text-lg text-foreground tracking-tight">GDGoC SVEC Hiring 4.0</span>
+            </div>
+
             <h1 className="text-balance text-5xl font-medium leading-[1.02] tracking-[-0.045em] sm:text-6xl text-foreground">
               Join the crowd.
             </h1>
             <p className="mt-5 max-w-md text-lg leading-relaxed text-muted-foreground">
-              Three short steps. Tell us who you are, which tracks you like,
-              and why you want to build with us.
+              Four steps to tell us who you are, which tracks you love, your club involvements,
+              and your links to build with Google on campus.
             </p>
             <div className="mt-10 flex items-end gap-1">
-              <Dot size={96} color={G.blue} shape="lean" />
-              <Dot size={112} color={G.red} shape="round" delay={0.6} />
-              <Dot size={92} color={G.yellow} shape="tall" delay={1.2} />
-              <Dot size={100} color={G.green} shape="squircle" delay={1.8} />
+              <Dot01 size={86} />
+              <Dot02 size={96} />
+              <Dot03 size={86} />
+              <Dot04 size={92} />
             </div>
             <p className="mt-8 text-sm text-muted-foreground">
-              Need admin access?{" "}
+              Need reviewer or admin access?{" "}
               <Link href="/login" className="text-foreground underline underline-offset-4">
                 Log in to portal
               </Link>
@@ -224,7 +412,7 @@ export default function ApplyPage() {
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">Sign in with Google to Apply</h2>
                   <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto leading-relaxed">
-                    To maintain verified student records and send your application updates, please sign in with your Google account first.
+                    To maintain verified student records and deliver status updates to your email, please sign in with your Google account first.
                   </p>
                 </div>
 
@@ -261,23 +449,17 @@ export default function ApplyPage() {
             ) : done ? (
               <div className="py-10 text-center">
                 <div className="mb-6 flex justify-center gap-2" aria-hidden="true">
-                  {[G.blue, G.red, G.yellow, G.green].map((c, i) => (
-                    <motion.span
-                      key={c}
-                      initial={{ y: 0 }}
-                      animate={{ y: [0, -22, 0] }}
-                      transition={{ duration: 0.5, delay: i * 0.12, repeat: 2, repeatDelay: 0.6 }}
-                      className="size-4 rounded-full"
-                      style={{ background: c }}
-                    />
-                  ))}
+                  <Dot01 size={64} />
+                  <Dot02 size={64} />
+                  <Dot03 size={64} />
+                  <Dot04 size={64} />
                 </div>
                 <h2 className="text-3xl font-bold tracking-tight text-foreground">Application Submitted! 🎉</h2>
                 <p className="mx-auto mt-3 max-w-sm text-muted-foreground text-sm leading-relaxed">
-                  Thanks, {f.name.split(" ")[0]}. A confirmation email has been sent to <strong>{f.email}</strong> with the WhatsApp community link.
+                  Thanks, {f.name.split(" ")[0]}. A confirmation email has been sent to <strong>{f.email}</strong> with your WhatsApp updates community link.
                 </p>
                 <div className="mt-6 p-4 rounded-2xl bg-green-50 border border-green-200 text-xs text-green-800">
-                  Check your inbox for further updates and interview schedules!
+                  Check your inbox for interview updates and recruitment schedules!
                 </div>
                 <Link
                   href="/"
@@ -308,11 +490,11 @@ export default function ApplyPage() {
                   </div>
                 )}
 
-                {/* progress dots */}
+                {/* Progress Indicators with Dot Mascots */}
                 <ol className="mb-8 flex items-center" aria-label="Progress">
                   {STEPS.map((s, i) => (
                     <li key={s} className="flex flex-1 items-center last:flex-none" aria-current={i === step ? "step" : undefined}>
-                      <span className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-2">
                         <span
                           className={cn(
                             "grid size-6 place-items-center rounded-full border text-xs font-medium transition-colors",
@@ -323,15 +505,12 @@ export default function ApplyPage() {
                         >
                           {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
                         </span>
-                        <span className={cn("hidden text-sm sm:block", i === step ? "text-foreground font-semibold" : "text-muted-foreground")}>
+                        <span className={cn("hidden text-xs font-semibold sm:block", i === step ? "text-foreground" : "text-muted-foreground")}>
                           {s}
                         </span>
                       </span>
                       {i < STEPS.length - 1 && (
-                        <span
-                          aria-hidden="true"
-                          className="mx-3 h-px flex-1 border-t border-dashed border-border"
-                        />
+                        <span aria-hidden="true" className="mx-2.5 h-px flex-1 border-t border-dashed border-border" />
                       )}
                     </li>
                   ))}
@@ -346,33 +525,73 @@ export default function ApplyPage() {
                     transition={{ duration: 0.2 }}
                     className="space-y-5"
                   >
+                    {/* STEP 0: Personal & Academic Details */}
                     {step === 0 && (
                       <>
-                        <Field label="Full name" error={errors.name}>
-                          <input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="As on your college ID" autoComplete="name" />
+                        <Field label="Full Name" error={errors.name} dotIndex={1} tooltip="Enter your name as printed on college ID">
+                          <input
+                            className={inputCls}
+                            value={f.name}
+                            onChange={(e) => set("name", e.target.value)}
+                            onBlur={() => { f.name.length >= 2 ? sfx.playSuccess() : sfx.playError(); }}
+                            placeholder="As on your college ID"
+                            autoComplete="name"
+                          />
                         </Field>
+
                         <div className="grid gap-5 sm:grid-cols-2">
-                          <Field label="College Email" error={errors.email}>
-                            <input type="email" className={inputCls} value={f.email} onChange={(e) => set("email", e.target.value)} placeholder="student@svec.edu.in" autoComplete="email" />
+                          <Field label="College Email" error={errors.email} dotIndex={2}>
+                            <input
+                              type="email"
+                              className={inputCls}
+                              value={f.email}
+                              onChange={(e) => set("email", e.target.value)}
+                              onBlur={() => { /^\S+@\S+\.\S+$/.test(f.email) ? sfx.playSuccess() : sfx.playError(); }}
+                              placeholder="student@svec.edu.in"
+                              autoComplete="email"
+                            />
                           </Field>
-                          <Field label="Phone (WhatsApp)">
-                            <input type="tel" className={inputCls} value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91" autoComplete="tel" />
+                          <Field label="Phone (WhatsApp)" dotIndex={3}>
+                            <input
+                              type="tel"
+                              className={inputCls}
+                              value={f.phone}
+                              onChange={(e) => set("phone", e.target.value)}
+                              placeholder="+91"
+                              autoComplete="tel"
+                            />
                           </Field>
                         </div>
-                        <Field label="Roll number" error={errors.roll}>
-                          <input className={inputCls} value={f.roll} onChange={(e) => set("roll", e.target.value.toUpperCase())} placeholder="e.g. 23A81A0501" />
+
+                        <Field label="Roll Number" error={errors.roll} dotIndex={4}>
+                          <input
+                            className={inputCls}
+                            value={f.roll}
+                            onChange={(e) => set("roll", e.target.value.toUpperCase())}
+                            onBlur={() => { f.roll.trim() ? sfx.playSuccess() : sfx.playError(); }}
+                            placeholder="e.g. 23A81A0501"
+                          />
                         </Field>
+
                         <div className="grid gap-5 sm:grid-cols-2">
-                          <Field label="Branch / Department" error={errors.branch}>
-                            <select className={inputCls} value={f.branch} onChange={(e) => set("branch", e.target.value)}>
+                          <Field label="Branch / Department" error={errors.branch} dotIndex={5} tooltip="Now includes CSE-AI and AIML">
+                            <select
+                              className={inputCls}
+                              value={f.branch}
+                              onChange={(e) => { set("branch", e.target.value); sfx.playPop(); }}
+                            >
                               <option value="">Select branch</option>
                               {BRANCHES.map((b) => (
                                 <option key={b} value={b}>{b}</option>
                               ))}
                             </select>
                           </Field>
-                          <Field label="Year of study" error={errors.year}>
-                            <select className={inputCls} value={f.year} onChange={(e) => set("year", e.target.value)}>
+                          <Field label="Year of Study" error={errors.year} dotIndex={6}>
+                            <select
+                              className={inputCls}
+                              value={f.year}
+                              onChange={(e) => { set("year", e.target.value); sfx.playPop(); }}
+                            >
                               <option value="">Select year</option>
                               {YEARS.map((y, idx) => (
                                 <option key={y} value={idx + 1}>{y}</option>
@@ -383,6 +602,7 @@ export default function ApplyPage() {
                       </>
                     )}
 
+                    {/* STEP 1: Track Selection */}
                     {step === 1 && (
                       <div className="space-y-6">
                         <div>
@@ -432,27 +652,163 @@ export default function ApplyPage() {
                       </div>
                     )}
 
+                    {/* STEP 2: Other Clubs & Mandatory Links */}
                     {step === 2 && (
-                      <>
-                        <Field label="Why do you want to join GDGoC SVEC?" error={errors.why}>
-                          <textarea
-                            rows={4}
+                      <div className="space-y-6">
+                        {/* Campus Clubs Checkboxes */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <FieldHeaderDot dotIndex={7} />
+                            <label className="text-sm font-semibold text-foreground">
+                              Are you currently in any other campus clubs?
+                            </label>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Select all that apply at Sri Vasavi Engineering College:
+                          </p>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {OTHER_CLUBS_LIST.map((club) => {
+                              const checked = f.otherClubs.includes(club);
+                              return (
+                                <button
+                                  key={club}
+                                  type="button"
+                                  onClick={() => toggleClub(club)}
+                                  className={cn(
+                                    "flex items-center gap-2.5 rounded-xl border p-3 text-left transition text-xs font-medium cursor-pointer",
+                                    checked
+                                      ? "border-primary bg-primary/10 text-foreground"
+                                      : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                                  )}
+                                >
+                                  <div className={cn("size-4 rounded border flex items-center justify-center", checked ? "bg-primary border-primary text-white" : "border-slate-300")}>
+                                    {checked && <Check className="size-3" strokeWidth={3} />}
+                                  </div>
+                                  <span>{club}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-3">
+                            <input
+                              type="text"
+                              className={inputCls}
+                              value={f.otherClubCustom}
+                              onChange={(e) => set("otherClubCustom", e.target.value)}
+                              placeholder="Other club / society name (if any)"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Role in Other Clubs */}
+                        <Field label="What is your current role in those clubs?" dotIndex={8}>
+                          <select
                             className={inputCls}
-                            value={f.why}
-                            onChange={(e) => set("why", e.target.value)}
-                            placeholder="Tell us what you're excited to learn, build, or contribute..."
-                          />
+                            value={f.clubRole}
+                            onChange={(e) => { set("clubRole", e.target.value); sfx.playPop(); }}
+                          >
+                            {CLUB_ROLES.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
                         </Field>
-                        <Field label="Portfolio, GitHub, or LinkedIn (optional)">
-                          <input
-                            type="url"
-                            className={inputCls}
-                            value={f.link}
-                            onChange={(e) => set("link", e.target.value)}
-                            placeholder="https://"
-                          />
-                        </Field>
-                      </>
+
+                        {/* Mandatory Links: GitHub, LinkedIn, Portfolio */}
+                        <div className="border-t border-dashed border-border pt-5 space-y-4">
+                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Profile Links (Mandatory)
+                          </p>
+
+                          <Field label="GitHub Profile URL (Mandatory)" error={errors.github} dotIndex={9}>
+                            <input
+                              type="url"
+                              className={inputCls}
+                              value={f.github}
+                              onChange={(e) => set("github", e.target.value)}
+                              onBlur={() => { f.github.trim() ? sfx.playSuccess() : sfx.playError(); }}
+                              placeholder="https://github.com/username"
+                            />
+                          </Field>
+
+                          <Field label="LinkedIn Profile URL (Mandatory)" error={errors.linkedin} dotIndex={10}>
+                            <input
+                              type="url"
+                              className={inputCls}
+                              value={f.linkedin}
+                              onChange={(e) => set("linkedin", e.target.value)}
+                              onBlur={() => { f.linkedin.trim() ? sfx.playSuccess() : sfx.playError(); }}
+                              placeholder="https://linkedin.com/in/username"
+                            />
+                          </Field>
+
+                          <Field label="Portfolio / Project Link (Mandatory)" error={errors.portfolio} dotIndex={11}>
+                            <input
+                              type="url"
+                              className={inputCls}
+                              value={f.portfolio}
+                              onChange={(e) => set("portfolio", e.target.value)}
+                              onBlur={() => { f.portfolio.trim() ? sfx.playSuccess() : sfx.playError(); }}
+                              placeholder="https://yourportfolio.dev or project URL"
+                            />
+                          </Field>
+                        </div>
+
+                        {/* Dynamic Extra Links with + Button */}
+                        <div className="border-t border-dashed border-border pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Additional Links / Demos
+                            </span>
+                            <button
+                              type="button"
+                              onClick={addExtraLink}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                            >
+                              <Plus className="size-3.5" /> Add more link
+                            </button>
+                          </div>
+
+                          {f.extraLinks.map((link, idx) => (
+                            <div key={idx} className="flex items-center gap-2 mb-2">
+                              <input
+                                type="text"
+                                value={link.label}
+                                onChange={(e) => updateExtraLink(idx, "label", e.target.value)}
+                                placeholder="Label (e.g. Behance, Hackerrank)"
+                                className={cn(inputCls, "w-1/3 text-xs py-2")}
+                              />
+                              <input
+                                type="url"
+                                value={link.url}
+                                onChange={(e) => updateExtraLink(idx, "url", e.target.value)}
+                                placeholder="https://"
+                                className={cn(inputCls, "flex-1 text-xs py-2")}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeExtraLink(idx)}
+                                className="p-2 text-slate-400 hover:text-red-500 cursor-pointer"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 3: Statement of Interest */}
+                    {step === 3 && (
+                      <Field label="Why do you want to join GDGoC SVEC?" error={errors.why} dotIndex={12} tooltip="Write at least 20 characters explaining your interest">
+                        <textarea
+                          rows={6}
+                          className={inputCls}
+                          value={f.why}
+                          onChange={(e) => set("why", e.target.value)}
+                          onBlur={() => { f.why.trim().length >= 20 ? sfx.playSuccess() : sfx.playError(); }}
+                          placeholder="Tell us what you're excited to learn, build, or contribute to GDGoC SVEC..."
+                        />
+                      </Field>
                     )}
                   </motion.div>
                 </AnimatePresence>
@@ -461,7 +817,7 @@ export default function ApplyPage() {
                   {step > 0 ? (
                     <button
                       type="button"
-                      onClick={() => setStep(step - 1)}
+                      onClick={() => { sfx.playPop(); setStep(step - 1); }}
                       className="text-sm text-muted-foreground hover:text-foreground cursor-pointer font-medium"
                     >
                       &larr; Back
@@ -477,7 +833,7 @@ export default function ApplyPage() {
                       <span className="flex items-center gap-2">
                         <Loader2 className="size-4 animate-spin" /> Submitting...
                       </span>
-                    ) : step === 2 ? (
+                    ) : step === 3 ? (
                       "Submit application"
                     ) : (
                       "Continue &rarr;"

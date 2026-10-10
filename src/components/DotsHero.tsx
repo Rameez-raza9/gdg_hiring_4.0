@@ -244,13 +244,8 @@ export const DotsHero = ({ onNavigateTab, showHeader = false }: DotsHeroProps) =
             }}
             className="flex items-center gap-2.5 text-lg font-semibold tracking-tight cursor-pointer"
           >
-            <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-              <i className="size-2.5 rounded-full" style={{ background: BLUE }} />
-              <i className="size-2.5 rounded-full" style={{ background: RED }} />
-              <i className="size-2.5 rounded-full" style={{ background: YELLOW }} />
-              <i className="size-2.5 rounded-full" style={{ background: GREEN }} />
-            </span>
-            GDGoC SVEC
+            <img src="/assets/logos/main_logo.jpeg" alt="GDGoC SVEC" className="size-8 rounded-lg object-contain border border-neutral-200 shadow-xs" />
+            <span>GDGoC SVEC</span>
           </a>
           <nav className="hidden items-center gap-7 text-sm text-neutral-600 md:flex">
             <a

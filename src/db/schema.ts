@@ -31,8 +31,14 @@ export interface ApplicationRecord {
   tracks: string;
   /** Statement of interest & motivation */
   why: string | null;
-  /** URL link to Portfolio, GitHub, or LinkedIn */
+  /** Primary URL link to Portfolio, GitHub, or LinkedIn */
   link: string | null;
+  /** JSON array of other clubs student belongs to */
+  other_clubs?: string | null;
+  /** Role in other clubs: 'Member' | 'Associate' | 'Lead' */
+  club_role?: string | null;
+  /** JSON array of dynamic extra links added with + button */
+  extra_links?: string | null;
   /** Current evaluation status in recruitment pipeline */
   status: ApplicationStatus;
   /** ISO Date string of application submission (YYYY-MM-DD) */

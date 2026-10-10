@@ -34,6 +34,20 @@ export async function GET() {
         tracks = [];
       }
 
+      let otherClubs: string[] = [];
+      try {
+        otherClubs = JSON.parse(String(r.other_clubs || "[]"));
+      } catch {
+        otherClubs = [];
+      }
+
+      let extraLinks: { label: string; url: string }[] = [];
+      try {
+        extraLinks = JSON.parse(String(r.extra_links || "[]"));
+      } catch {
+        extraLinks = [];
+      }
+
       return {
         id: String(r.id),
         name: String(r.name),
@@ -47,6 +61,9 @@ export async function GET() {
         submitted: String(r.submitted || "2026-10-09"),
         why: String(r.why || ""),
         link: r.link ? String(r.link) : undefined,
+        otherClubs,
+        clubRole: r.club_role ? String(r.club_role) : undefined,
+        extraLinks,
         reviews: reviewsByApp[String(r.id)] || [],
       };
     });

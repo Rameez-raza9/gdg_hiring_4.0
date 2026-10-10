@@ -60,13 +60,8 @@ const DotsHero = () => {
       {/* Nav */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-          <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-            <i className="size-2.5 rounded-full" style={{ background: G.blue }} />
-            <i className="size-2.5 rounded-full" style={{ background: G.red }} />
-            <i className="size-2.5 rounded-full" style={{ background: G.yellow }} />
-            <i className="size-2.5 rounded-full" style={{ background: G.green }} />
-          </span>
-          GDGoC SVEC
+          <img src="/assets/logos/main_logo.jpeg" alt="GDGoC SVEC" className="size-8 rounded-lg object-contain border border-border shadow-xs" />
+          <span>GDGoC SVEC</span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <Link href="/#team" className="hover:text-foreground">Team</Link>
