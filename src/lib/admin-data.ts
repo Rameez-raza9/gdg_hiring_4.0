@@ -84,141 +84,7 @@ export const USERS: User[] = [
 
 export const REVIEWERS = USERS.filter((u) => ["Admin"].includes(u.role) && u.status === "Active");
 
-export const APPLICATIONS: Application[] = [
-  {
-    id: "A-1001",
-    name: "K. Sai Teja",
-    email: "saiteja.k@svec.edu.in",
-    phone: "+91 9848022338",
-    roll: "22A81A0501",
-    branch: "CSE",
-    year: 3,
-    tracks: ["genai-aiml", "cloud-devops"],
-    status: "Shortlisted",
-    submitted: "2026-10-02",
-    why: "Active member of open source clubs, built RAG pipelines using Gemini API, seeking to mentor junior builders in GDGoC SVEC.",
-    link: "https://github.com/saiteja-k",
-    reviews: [
-      { reviewer: "Vinay Siddha", reviewerColor: G.blue, score: 5, recommend: "Yes", note: "Outstanding Gemini API knowledge and strong leadership attitude.", date: "2026-10-03" },
-      { reviewer: "Madhu Somala", reviewerColor: G.yellow, score: 4, recommend: "Yes", note: "Demonstrated deep cloud experience with hands-on projects.", date: "2026-10-04" },
-    ],
-  },
-  {
-    id: "A-1002",
-    name: "P. Bhavya Sri",
-    email: "bhavyasri.p@svec.edu.in",
-    phone: "+91 9440123456",
-    roll: "23A81A05B4",
-    branch: "AI & DS",
-    year: 2,
-    tracks: ["genai-aiml"],
-    status: "Interview",
-    submitted: "2026-10-04",
-    why: "Keen on fine-tuning vision and language models, eager to conduct interactive sessions on modern deep learning frameworks.",
-    link: "https://github.com/bhavyasri",
-    reviews: [
-      { reviewer: "Jaswanth Thota", reviewerColor: G.red, score: 4, recommend: "Yes", note: "Very focused on AI/ML and willing to lead peer cohorts.", date: "2026-10-05" },
-    ],
-  },
-  {
-    id: "A-1003",
-    name: "V. Chaitanya Krishna",
-    email: "chaitanya.v@svec.edu.in",
-    phone: "+91 9866554433",
-    roll: "22A81A1208",
-    branch: "IT",
-    year: 3,
-    tracks: ["web-app", "coding"],
-    status: "Accepted",
-    submitted: "2026-09-28",
-    why: "Full stack developer proficient with Next.js, React 19, TypeScript and Tailwind CSS. Built college portals and hackathon winning apps.",
-    link: "https://github.com/chaitanyakrishna",
-    reviews: [
-      { reviewer: "Rohith Goli", reviewerColor: G.green, score: 5, recommend: "Yes", note: "Superb Next.js and frontend skills. Ready to ship club projects immediately.", date: "2026-09-29" },
-    ],
-  },
-  {
-    id: "A-1004",
-    name: "M. Durga Prasad",
-    email: "durgaprasad.m@svec.edu.in",
-    phone: "+91 9121234567",
-    roll: "24A81A0412",
-    branch: "ECE",
-    year: 1,
-    tracks: ["cloud-devops"],
-    status: "In review",
-    submitted: "2026-10-06",
-    why: "Passionate about Docker, Linux systems, and cloud fundamentals. Want to gain hands-on production deployment experience.",
-    link: "https://github.com/durgaprasad-m",
-    reviews: [
-      { reviewer: "A. V. S. S. S. K. Koushik", reviewerColor: G.blue, score: 4, recommend: "Maybe", note: "Strong curiosity in Docker. Solid potential for year 1 student.", date: "2026-10-07" },
-    ],
-  },
-  {
-    id: "A-1005",
-    name: "G. Harini",
-    email: "harini.g@svec.edu.in",
-    phone: "+91 9988776655",
-    roll: "23A81A0589",
-    branch: "CSE",
-    year: 2,
-    tracks: ["design", "events"],
-    status: "Accepted",
-    submitted: "2026-09-30",
-    why: "Designed branding and flyers for college tech fest, proficient in Figma and community storytelling.",
-    link: "https://figma.com/@harinig",
-    reviews: [
-      { reviewer: "S. P. V. Sai Akhil", reviewerColor: G.yellow, score: 5, recommend: "Yes", note: "Impressive portfolio in Figma with clean typography.", date: "2026-10-01" },
-    ],
-  },
-  {
-    id: "A-1006",
-    name: "N. Rakesh",
-    email: "rakesh.n@svec.edu.in",
-    phone: "+91 9700112233",
-    roll: "24A81A0215",
-    branch: "EEE",
-    year: 1,
-    tracks: ["coding"],
-    status: "New",
-    submitted: "2026-10-08",
-    why: "Competitive programmer solving LeetCode daily, eager to participate in Google Solution Challenge.",
-    link: "https://github.com/rakesh-n",
-    reviews: [],
-  },
-  {
-    id: "A-1007",
-    name: "S. Sneha Latha",
-    email: "snehalatha.s@svec.edu.in",
-    phone: "+91 9490887766",
-    roll: "22A81A05G1",
-    branch: "CSE",
-    year: 3,
-    tracks: ["social", "pr"],
-    status: "Shortlisted",
-    submitted: "2026-10-05",
-    why: "Active social media coordinator, helped drive 500+ registrations for campus events.",
-    link: "https://linkedin.com/in/snehalatha",
-    reviews: [
-      { reviewer: "R. Shanmuka Rao", reviewerColor: G.red, score: 4, recommend: "Yes", note: "High energy and strong interpersonal communication skills.", date: "2026-10-06" },
-    ],
-  },
-  {
-    id: "A-1008",
-    name: "D. Varun Tej",
-    email: "varuntej.d@svec.edu.in",
-    phone: "+91 9618112244",
-    roll: "23A81A4210",
-    branch: "AI & DS",
-    year: 2,
-    tracks: ["web-app"],
-    status: "New",
-    submitted: "2026-10-09",
-    why: "Front-end engineer building accessible React applications and looking to contribute to SVEC web initiatives.",
-    link: "https://github.com/varuntej-d",
-    reviews: [],
-  },
-];
+export const APPLICATIONS: Application[] = [];
 
 /* ---------- Database Fetchers (Turso Cloud) ---------- */
 
@@ -229,7 +95,7 @@ export async function fetchLiveApplications(): Promise<Application[]> {
       turso.execute("SELECT * FROM reviews ORDER BY created_at DESC"),
     ]);
 
-    if (!res.rows.length) return APPLICATIONS;
+    if (!res.rows.length) return [];
 
     const reviewsByApp: Record<string, Review[]> = {};
 
@@ -289,7 +155,7 @@ export async function fetchLiveApplications(): Promise<Application[]> {
     });
   } catch (error) {
     console.error("Failed to fetch live applications from Turso:", error);
-    return APPLICATIONS;
+    return [];
   }
 }
 
@@ -363,8 +229,8 @@ export const countBy = <T,>(items: T[], key: (t: T) => string) => {
 };
 
 /** applications per day across the window, for trend charts */
-export const dailyCounts = () => {
-  const map = countBy(APPLICATIONS, (a) => a.submitted);
+export const dailyCounts = (apps: Application[] = []) => {
+  const map = countBy(apps, (a) => a.submitted);
   const dates = Array.from(map.keys()).sort();
   return dates.map((date) => ({ date, count: map.get(date) ?? 0 }));
 };

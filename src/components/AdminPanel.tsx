@@ -170,48 +170,16 @@ export const LogoIcon = () => {
   );
 };
 
-const SAMPLE_APPLICATIONS = [
-  {
-    id: "APP-101",
-    name: "Aravind Sharma",
-    email: "aravind@svec.edu.in",
-    roll: "22A81A0512",
-    track: "Technical",
-    role: "Web Development",
-    year: "3rd Year",
-    status: "Pending",
-  },
-  {
-    id: "APP-102",
-    name: "Sneha Reddy",
-    email: "sneha.r@svec.edu.in",
-    roll: "23A81A0545",
-    track: "Non-Technical",
-    role: "UI/UX & Product Design",
-    year: "2nd Year",
-    status: "Shortlisted",
-  },
-  {
-    id: "APP-103",
-    name: "Karthik Varma",
-    email: "karthik.v@svec.edu.in",
-    roll: "22A81A0589",
-    track: "Technical",
-    role: "AI / Machine Learning",
-    year: "3rd Year",
-    status: "Interviewed",
-  },
-  {
-    id: "APP-104",
-    name: "Divya Teja",
-    email: "divya@svec.edu.in",
-    roll: "24A81A0504",
-    track: "Non-Technical",
-    role: "Event Management",
-    year: "1st Year",
-    status: "Pending",
-  },
-];
+const SAMPLE_APPLICATIONS: {
+  id: string;
+  name: string;
+  email: string;
+  roll: string;
+  track: string;
+  role: string;
+  year: string;
+  status: string;
+}[] = [];
 
 const AdminDashboardContent = ({ activeTab }: { activeTab: string }) => {
   return (
@@ -325,12 +293,19 @@ const AdminDashboardContent = ({ activeTab }: { activeTab: string }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800">
-              {SAMPLE_APPLICATIONS.map((app) => (
-                <tr key={app.id} className="hover:bg-neutral-900/50 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="font-medium text-white">{app.name}</div>
-                    <div className="text-xs text-neutral-500">{app.email}</div>
+              {SAMPLE_APPLICATIONS.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-sm text-neutral-500">
+                    No applications received yet. Real applications will appear here.
                   </td>
+                </tr>
+              ) : (
+                SAMPLE_APPLICATIONS.map((app) => (
+                  <tr key={app.id} className="hover:bg-neutral-900/50 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-medium text-white">{app.name}</div>
+                      <div className="text-xs text-neutral-500">{app.email}</div>
+                    </td>
                   <td className="py-3.5 px-4 font-mono text-xs text-neutral-400">{app.roll}</td>
                   <td className="py-3.5 px-4">
                     <span
@@ -373,7 +348,7 @@ const AdminDashboardContent = ({ activeTab }: { activeTab: string }) => {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

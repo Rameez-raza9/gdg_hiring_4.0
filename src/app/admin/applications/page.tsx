@@ -12,7 +12,8 @@ import { ApplicationToggle } from "@/components/admin/application-toggle";
 type Sort = "newest" | "score";
 
 export default function ApplicationsPage() {
-  const [apps, setApps] = useState<Application[]>(APPLICATIONS);
+  const [apps, setApps] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "All">("All");
   const [track, setTrack] = useState("all");
@@ -26,12 +27,16 @@ export default function ApplicationsPage() {
         const res = await fetch("/api/applications");
         if (res.ok) {
           const data = await res.json();
-          if (active && Array.isArray(data.applications) && data.applications.length > 0) {
+          if (active && Array.isArray(data.applications)) {
             setApps(data.applications);
           }
         }
       } catch (err) {
         console.error("Failed to load applications:", err);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     }
     loadApps();
@@ -216,11 +221,18 @@ export default function ApplicationsPage() {
               ))}
             </tbody>
           </table>
-          {rows.length === 0 && (
+          {loading ? (
+            <div className="px-6 py-14 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent inline-block" />
+              <span>Loading applications from database...</span>
+            </div>
+          ) : rows.length === 0 ? (
             <p className="px-6 py-14 text-center text-sm text-muted-foreground">
-              No applications match these filters.
+              {apps.length === 0
+                ? "No applications received yet. Real applications submitted by students will appear here."
+                : "No applications match these filters."}
             </p>
-          )}
+          ) : null}
         </div>
 
         <div className="border-t border-border px-6 py-3.5 text-xs text-muted-foreground">

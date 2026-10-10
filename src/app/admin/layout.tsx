@@ -4,11 +4,12 @@ import { ArrowLeft, Bell, Search } from "lucide-react";
 import AdminNav from "@/components/admin/admin-nav";
 import { Avatar } from "@/components/admin/ui";
 import { G } from "@/lib/brand";
-import { APPLICATIONS, USERS } from "@/lib/admin-data";
+import { fetchLiveApplications, USERS } from "@/lib/admin-data";
 import AdminGuard from "@/components/admin/admin-guard";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const newCount = APPLICATIONS.filter((a) => a.status === "New").length;
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const applications = await fetchLiveApplications();
+  const newCount = applications.filter((a) => a.status === "New").length;
   const me = USERS[0];
 
   return (
