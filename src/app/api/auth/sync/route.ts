@@ -9,36 +9,52 @@ export async function POST(req: Request) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const isAdmin = cleanEmail === "vinaysiddha19@gmail.com";
-    const role = isAdmin ? "Admin" : "Member";
-
+    const isSuperAdmin = cleanEmail === "vinaysiddha19@gmail.com";
     const userId = id || `u_${Date.now()}`;
     const displayName = name || email.split("@")[0];
 
+    // 1. Check if user already exists to preserve any admin-assigned RBAC role
+    const existing = await turso.execute({
+      sql: "SELECT id, role, status FROM users WHERE LOWER(email) = ?",
+      args: [cleanEmail],
+    });
+
+    let assignedRole = "Member";
+
+    if (isSuperAdmin) {
+      assignedRole = "Admin";
+    } else if (existing.rows.length > 0 && existing.rows[0].role) {
+      // Preserve role assigned by admin in Admin Panel
+      assignedRole = String(existing.rows[0].role);
+    } else {
+      // Default to Member for any new login
+      assignedRole = "Member";
+    }
+
+    // 2. Upsert user record
     await turso.execute({
       sql: `
         INSERT INTO users (id, name, email, role, status, photo_url, last_active)
         VALUES (?, ?, ?, ?, 'Active', ?, (datetime('now')))
         ON CONFLICT(email) DO UPDATE SET
           name = COALESCE(excluded.name, users.name),
-          role = CASE WHEN LOWER(users.email) = 'vinaysiddha19@gmail.com' THEN 'Admin' ELSE users.role END,
+          role = ?,
           photo_url = COALESCE(excluded.photo_url, users.photo_url),
           last_active = (datetime('now'))
       `,
-      args: [userId, displayName, cleanEmail, role, photoUrl || null],
+      args: [userId, displayName, cleanEmail, assignedRole, photoUrl || null, assignedRole],
     });
 
-    if (isAdmin) {
-      await turso.execute({
-        sql: `UPDATE users SET role = 'Admin'`,
-        args: [],
-      });
-    }
-
-    console.log(`[Turso] Synced user ${cleanEmail} (${displayName}) -> role: ${role}`);
+    console.log(`[Turso] Synced user ${cleanEmail} (${displayName}) -> role: ${assignedRole}`);
     return NextResponse.json({
       ok: true,
-      user: { id: userId, name: displayName, email: cleanEmail, role, isAdmin },
+      user: {
+        id: userId,
+        name: displayName,
+        email: cleanEmail,
+        role: assignedRole,
+        isAdmin: assignedRole === "Admin" || isSuperAdmin,
+      },
     });
   } catch (error) {
     console.error("User sync error:", error);

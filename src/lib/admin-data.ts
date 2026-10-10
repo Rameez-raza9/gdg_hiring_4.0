@@ -221,10 +221,13 @@ export const APPLICATIONS: Application[] = [
 
 export async function fetchLiveApplications(): Promise<Application[]> {
   try {
-    const res = await turso.execute("SELECT * FROM applications ORDER BY submitted DESC");
+    const [res, revRes] = await Promise.all([
+      turso.execute("SELECT * FROM applications ORDER BY submitted DESC"),
+      turso.execute("SELECT * FROM reviews ORDER BY created_at DESC"),
+    ]);
+
     if (!res.rows.length) return APPLICATIONS;
 
-    const revRes = await turso.execute("SELECT * FROM reviews");
     const reviewsByApp: Record<string, Review[]> = {};
 
     for (const r of revRes.rows) {
@@ -272,18 +275,30 @@ export async function fetchLiveApplications(): Promise<Application[]> {
 
 export async function fetchLiveUsers(): Promise<User[]> {
   try {
-    const res = await turso.execute("SELECT * FROM users ORDER BY created_at ASC");
+    const res = await turso.execute(`
+      SELECT * FROM users 
+      ORDER BY 
+        CASE WHEN LOWER(email) = 'vinaysiddha19@gmail.com' THEN 0 ELSE 1 END,
+        created_at ASC
+    `);
     if (!res.rows.length) return USERS;
 
-    return res.rows.map((u) => ({
-      id: String(u.id),
-      name: String(u.name),
-      email: String(u.email),
-      role: (String(u.role || "Member") as Role),
-      status: (String(u.status || "Active") as UserStatus),
-      lastActive: String(u.last_active || "Recent"),
-      color: colorFor(String(u.name)),
-    }));
+    return res.rows.map((u) => {
+      const email = String(u.email || "");
+      const isSuperAdmin = email.trim().toLowerCase() === "vinaysiddha19@gmail.com";
+      const role = (isSuperAdmin ? "Admin" : String(u.role || "Member")) as Role;
+      const name = String(u.name || email.split("@")[0]);
+
+      return {
+        id: String(u.id),
+        name,
+        email,
+        role,
+        status: (String(u.status || "Active") as UserStatus),
+        lastActive: u.last_active ? String(u.last_active).slice(0, 16) : "Recent",
+        color: colorFor(name),
+      };
+    });
   } catch (error) {
     console.error("Failed to fetch live users from Turso:", error);
     return USERS;

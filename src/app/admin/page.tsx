@@ -3,30 +3,33 @@ import { ArrowRight } from "lucide-react";
 import { Dot } from "@/components/dot";
 import { G, TRACKS } from "@/lib/brand";
 import {
-  APPLICATIONS, STATUSES, STATUS_COLOR, avgScore, countBy, fmtDate,
+  STATUSES, STATUS_COLOR, avgScore, countBy, fmtDate, fetchLiveApplications,
 } from "@/lib/admin-data";
 import {
   Avatar, Card, CardHeader, PageHeader, ScoreDots, StatCard, StatusBadge, TrackChip, btnGhost, btnPrimary,
 } from "@/components/admin/ui";
 import { HBars, StackedBar } from "@/components/admin/charts";
-
 import { ApplicationToggle } from "@/components/admin/application-toggle";
 
-export default function AdminOverview() {
-  const total = APPLICATIONS.length;
-  const byStatus = countBy(APPLICATIONS, (a) => a.status);
-  const thisWeek = APPLICATIONS.filter((a) => a.submitted >= "2026-10-02").length;
+export const dynamic = "force-dynamic";
+
+export default async function AdminOverview() {
+  const applications = await fetchLiveApplications();
+
+  const total = applications.length;
+  const byStatus = countBy(applications, (a) => a.status);
+  const thisWeek = applications.filter((a) => a.submitted >= "2026-10-02").length;
   const awaiting = byStatus.get("New") ?? 0;
   const advancing = (byStatus.get("Shortlisted") ?? 0) + (byStatus.get("Interview") ?? 0);
   const accepted = byStatus.get("Accepted") ?? 0;
 
-  const recent = [...APPLICATIONS].sort((a, b) => b.submitted.localeCompare(a.submitted)).slice(0, 6);
-  const queue = APPLICATIONS.filter((a) => a.status === "New").sort((a, b) => a.submitted.localeCompare(b.submitted)).slice(0, 5);
+  const recent = [...applications].sort((a, b) => b.submitted.localeCompare(a.submitted)).slice(0, 6);
+  const queue = applications.filter((a) => a.status === "New").sort((a, b) => a.submitted.localeCompare(b.submitted)).slice(0, 5);
 
   const trackCounts = TRACKS.map((t) => ({
     label: t.label,
     color: t.color,
-    value: APPLICATIONS.filter((a) => a.tracks.includes(t.id)).length,
+    value: applications.filter((a) => a.tracks.includes(t.id)).length,
   })).sort((a, b) => b.value - a.value).slice(0, 5);
 
   return (
@@ -52,7 +55,7 @@ export default function AdminOverview() {
         <StatCard label="Total applications" value={total} note={`${thisWeek} in the last 7 days`} color={G.blue} />
         <StatCard label="Awaiting review" value={awaiting} note="Not reviewed by anyone yet" color={G.red} />
         <StatCard label="Moving forward" value={advancing} note="Shortlisted or in interview" color={G.yellow} />
-        <StatCard label="Accepted" value={accepted} note={`${Math.round((accepted / total) * 100)}% of all applicants`} color={G.green} />
+        <StatCard label="Accepted" value={accepted} note={`${total > 0 ? Math.round((accepted / total) * 100) : 0}% of all applicants`} color={G.green} />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.6fr_1fr]">

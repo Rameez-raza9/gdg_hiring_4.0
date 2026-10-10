@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
-import { APPLICATIONS } from "@/lib/admin-data";
+import { fetchLiveApplications, APPLICATIONS } from "@/lib/admin-data";
 import ApplicationDetailClient from "./detail-client";
 
-export function generateStaticParams() {
+export const dynamic = "force-dynamic";
+
+export async function generateStaticParams() {
   return APPLICATIONS.map((a) => ({ id: a.id }));
 }
 
@@ -12,7 +14,8 @@ export default async function ApplicationDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const a = APPLICATIONS.find((x) => x.id === id);
+  const applications = await fetchLiveApplications();
+  const a = applications.find((x) => x.id === id);
 
   if (!a) notFound();
 

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { G } from "@/lib/brand";
 import {
-  APPLICATIONS, REVIEWERS, STATUS_COLOR, avgScore, fmtDate, type Status,
+  STATUS_COLOR, avgScore, fmtDate, type Status, fetchLiveApplications, fetchLiveUsers,
 } from "@/lib/admin-data";
 import { Avatar, Card, CardHeader, PageHeader, ScoreDots, StatCard, TrackChip } from "@/components/admin/ui";
 import { HBars } from "@/components/admin/charts";
+
+export const dynamic = "force-dynamic";
 
 const COLUMNS: { status: Status; hint: string }[] = [
   { status: "New", hint: "Waiting for a first review" },
@@ -16,18 +18,25 @@ const COLUMNS: { status: Status; hint: string }[] = [
 
 const PER_COLUMN = 5;
 
-export default function ReviewsPage() {
-  const allReviews = APPLICATIONS.flatMap((a) =>
+export default async function ReviewsPage() {
+  const [apps, users] = await Promise.all([
+    fetchLiveApplications(),
+    fetchLiveUsers(),
+  ]);
+
+  const activeReviewers = users.filter((u) => ["Admin", "Lead", "Reviewer"].includes(u.role) && u.status === "Active");
+
+  const allReviews = apps.flatMap((a) =>
     a.reviews.map((r) => ({ ...r, applicant: a.name, appId: a.id })),
   );
   const avg = allReviews.reduce((s, r) => s + r.score, 0) / (allReviews.length || 1);
-  const needSecond = APPLICATIONS.filter((a) => a.status === "In review" && a.reviews.length < 2).length;
-  const unanimous = APPLICATIONS.filter((a) => a.reviews.length >= 2 && a.reviews.every((r) => r.recommend === "Yes")).length;
+  const needSecond = apps.filter((a) => a.status === "In review" && a.reviews.length < 2).length;
+  const unanimous = apps.filter((a) => a.reviews.length >= 2 && a.reviews.every((r) => r.recommend === "Yes")).length;
 
-  const workload = REVIEWERS.map((u) => ({
+  const workload = activeReviewers.map((u) => ({
     label: u.name,
     color: u.color,
-    value: allReviews.filter((r) => r.reviewer === u.name).length,
+    value: allReviews.filter((r) => r.reviewer.toLowerCase() === u.name.toLowerCase()).length,
   })).sort((a, b) => b.value - a.value);
 
   const latest = [...allReviews].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
@@ -36,7 +45,7 @@ export default function ReviewsPage() {
     <>
       <PageHeader
         title="Hiring reviews"
-        description="Move applicants through the pipeline and see what reviewers are saying."
+        description="Move applicants through the pipeline and see what reviewers are saying in real-time."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -50,7 +59,7 @@ export default function ReviewsPage() {
       <div className="-mx-6 mt-6 overflow-x-auto px-6 pb-2 lg:-mx-8 lg:px-8">
         <div className="grid min-w-[1100px] grid-cols-5 gap-4">
           {COLUMNS.map(({ status, hint }) => {
-            const items = APPLICATIONS.filter((a) => a.status === status).sort(
+            const items = apps.filter((a) => a.status === status).sort(
               (a, b) => avgScore(b) - avgScore(a) || b.submitted.localeCompare(a.submitted),
             );
             const color = STATUS_COLOR[status];

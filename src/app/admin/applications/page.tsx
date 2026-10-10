@@ -1,43 +1,95 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Download, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TRACK_GROUPS } from "@/lib/brand";
-import { APPLICATIONS, STATUSES, STATUS_COLOR, avgScore, fmtDate, type Status } from "@/lib/admin-data";
+import { APPLICATIONS, STATUSES, STATUS_COLOR, avgScore, fmtDate, type Application, type Status } from "@/lib/admin-data";
 import { Avatar, Card, PageHeader, ScoreDots, StatusBadge, TrackChip, btnGhost } from "@/components/admin/ui";
+import { ApplicationToggle } from "@/components/admin/application-toggle";
 
 type Sort = "newest" | "score";
 
-import { ApplicationToggle } from "@/components/admin/application-toggle";
-
 export default function ApplicationsPage() {
+  const [apps, setApps] = useState<Application[]>(APPLICATIONS);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "All">("All");
   const [track, setTrack] = useState("all");
   const [sort, setSort] = useState<Sort>("newest");
 
-  const counts = useMemo(() => {
-    const m = new Map<string, number>([["All", APPLICATIONS.length]]);
-    APPLICATIONS.forEach((a) => m.set(a.status, (m.get(a.status) ?? 0) + 1));
-    return m;
+  // Fetch live applications from Turso
+  useEffect(() => {
+    let active = true;
+    async function loadApps() {
+      try {
+        const res = await fetch("/api/applications");
+        if (res.ok) {
+          const data = await res.json();
+          if (active && Array.isArray(data.applications) && data.applications.length > 0) {
+            setApps(data.applications);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load applications:", err);
+      }
+    }
+    loadApps();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const counts = useMemo(() => {
+    const m = new Map<string, number>([["All", apps.length]]);
+    apps.forEach((a) => m.set(a.status, (m.get(a.status) ?? 0) + 1));
+    return m;
+  }, [apps]);
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return APPLICATIONS.filter(
-      (a) =>
-        (status === "All" || a.status === status) &&
-        (track === "all" || a.tracks.includes(track)) &&
-        (!s ||
-          a.name.toLowerCase().includes(s) ||
-          a.email.toLowerCase().includes(s) ||
-          a.roll.toLowerCase().includes(s)),
-    ).sort((a, b) =>
-      sort === "newest" ? b.submitted.localeCompare(a.submitted) : avgScore(b) - avgScore(a),
-    );
-  }, [q, status, track, sort]);
+    return apps
+      .filter(
+        (a) =>
+          (status === "All" || a.status === status) &&
+          (track === "all" || a.tracks.includes(track)) &&
+          (!s ||
+            a.name.toLowerCase().includes(s) ||
+            a.email.toLowerCase().includes(s) ||
+            a.roll.toLowerCase().includes(s)),
+      )
+      .sort((a, b) =>
+        sort === "newest" ? b.submitted.localeCompare(a.submitted) : avgScore(b) - avgScore(a),
+      );
+  }, [apps, q, status, track, sort]);
+
+  const exportCSV = () => {
+    const headers = ["ID", "Name", "Email", "Phone", "Roll Number", "Branch", "Year", "Tracks", "Status", "Average Score", "Submitted Date"];
+    const csvRows = [headers.join(",")];
+    for (const a of apps) {
+      const row = [
+        `"${a.id}"`,
+        `"${a.name.replace(/"/g, '""')}"`,
+        `"${a.email}"`,
+        `"${a.phone}"`,
+        `"${a.roll}"`,
+        `"${a.branch}"`,
+        `"${a.year}"`,
+        `"${a.tracks.join("; ")}"`,
+        `"${a.status}"`,
+        `"${avgScore(a).toFixed(1)}"`,
+        `"${a.submitted}"`,
+      ];
+      csvRows.push(row.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gdg_applications_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const field =
     "rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-foreground/40";
@@ -46,11 +98,11 @@ export default function ApplicationsPage() {
     <>
       <PageHeader
         title="Applications"
-        description={`${APPLICATIONS.length} applications received this cycle.`}
+        description={`${apps.length} applications received in Turso cloud database.`}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <ApplicationToggle />
-            <button className={btnGhost}>
+            <button className={btnGhost} onClick={exportCSV}>
               <Download className="size-4" />
               Export CSV
             </button>
@@ -172,7 +224,7 @@ export default function ApplicationsPage() {
         </div>
 
         <div className="border-t border-border px-6 py-3.5 text-xs text-muted-foreground">
-          Showing {rows.length} of {APPLICATIONS.length}
+          Showing {rows.length} of {apps.length}
         </div>
       </Card>
     </>

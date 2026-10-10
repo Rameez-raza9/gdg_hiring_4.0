@@ -1,31 +1,40 @@
 import { G, TRACK_GROUPS } from "@/lib/brand";
 import {
-  APPLICATIONS, STATUSES, STATUS_COLOR, avgScore, countBy, dailyCounts, fmtDate,
+  STATUSES, STATUS_COLOR, avgScore, countBy, fmtDate, fetchLiveApplications,
 } from "@/lib/admin-data";
 import { Card, CardHeader, PageHeader, StatCard } from "@/components/admin/ui";
 import { AreaTrend, Donut, Funnel, HBars } from "@/components/admin/charts";
 
-export default function AnalyticsPage() {
-  const total = APPLICATIONS.length;
-  const daily = dailyCounts();
-  const peak = daily.reduce((m, d) => (d.count > m.count ? d : m), daily[0]);
-  const reviewed = APPLICATIONS.filter((a) => a.reviews.length > 0);
-  const avg = reviewed.reduce((s, a) => s + avgScore(a), 0) / (reviewed.length || 1);
-  const accepted = APPLICATIONS.filter((a) => a.status === "Accepted").length;
+export const dynamic = "force-dynamic";
 
-  const byStatus = countBy(APPLICATIONS, (a) => a.status);
+export default async function AnalyticsPage() {
+  const applications = await fetchLiveApplications();
+
+  const total = applications.length;
+
+  // Compute daily counts dynamically from live applications
+  const map = countBy(applications, (a) => a.submitted);
+  const dates = Array.from(map.keys()).sort();
+  const daily = dates.length > 0 ? dates.map((date) => ({ date, count: map.get(date) ?? 0 })) : [{ date: "2026-10-09", count: total }];
+
+  const peak = daily.reduce((m, d) => (d.count > m.count ? d : m), daily[0]);
+  const reviewed = applications.filter((a) => a.reviews.length > 0);
+  const avg = reviewed.reduce((s, a) => s + avgScore(a), 0) / (reviewed.length || 1);
+  const accepted = applications.filter((a) => a.status === "Accepted").length;
+
+  const byStatus = countBy(applications, (a) => a.status);
 
   const funnel = [
     { label: "Applied", value: total, color: G.blue },
     { label: "Reviewed", value: reviewed.length, color: "#669DF6" },
     {
       label: "Shortlisted",
-      value: APPLICATIONS.filter((a) => ["Shortlisted", "Interview", "Accepted"].includes(a.status)).length,
+      value: applications.filter((a) => ["Shortlisted", "Interview", "Accepted"].includes(a.status)).length,
       color: G.yellow,
     },
     {
       label: "Interviewed",
-      value: APPLICATIONS.filter((a) => ["Interview", "Accepted"].includes(a.status)).length,
+      value: applications.filter((a) => ["Interview", "Accepted"].includes(a.status)).length,
       color: "#A142F4",
     },
     { label: "Accepted", value: accepted, color: G.green },
@@ -33,17 +42,17 @@ export default function AnalyticsPage() {
 
   const byYear = [1, 2, 3, 4].map((y, i) => ({
     label: `Year ${y}`,
-    value: APPLICATIONS.filter((a) => a.year === y).length,
+    value: applications.filter((a) => a.year === y).length,
     color: [G.blue, G.red, G.yellow, G.green][i],
   }));
 
-  const branchMap = countBy(APPLICATIONS, (a) => a.branch);
+  const branchMap = countBy(applications, (a) => a.branch);
   const byBranch = [...branchMap.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([label, value], i) => ({ label, value, color: [G.blue, G.red, G.yellow, G.green][i % 4] }));
 
   const trackRows = TRACK_GROUPS.flatMap((g) => g.tracks).map((t) => {
-    const apps = APPLICATIONS.filter((a) => a.tracks.includes(t.id));
+    const apps = applications.filter((a) => a.tracks.includes(t.id));
     const scored = apps.filter((a) => a.reviews.length);
     return {
       track: t,
@@ -55,7 +64,7 @@ export default function AnalyticsPage() {
 
   const groupTotals = TRACK_GROUPS.map((g) => ({
     label: g.group,
-    value: APPLICATIONS.filter((a) => a.tracks.some((id) => g.tracks.some((t) => t.id === id))).length,
+    value: applications.filter((a) => a.tracks.some((id) => g.tracks.some((t) => t.id === id))).length,
     color: g.group === "Technical" ? G.blue : G.yellow,
   }));
 
@@ -64,12 +73,12 @@ export default function AnalyticsPage() {
       <PageHeader title="Analytics" description="How the current recruitment cycle is performing." />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Applications" value={total} note="Since 20 Sep" color={G.blue} />
+        <StatCard label="Applications" value={total} note="Total in Turso" color={G.blue} />
         <StatCard label="Busiest day" value={peak.count} note={`On ${fmtDate(peak.date)}`} color={G.red} />
         <StatCard label="Average score" value={avg.toFixed(1)} note="Across reviewed applicants" color={G.yellow} />
         <StatCard
           label="Acceptance rate"
-          value={`${Math.round((accepted / total) * 100)}%`}
+          value={`${total > 0 ? Math.round((accepted / total) * 100) : 0}%`}
           note={`${accepted} of ${total} applicants`}
           color={G.green}
         />
