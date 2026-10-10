@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
-import { fetchLiveApplications, APPLICATIONS } from "@/lib/admin-data";
+import { fetchLiveApplications } from "@/lib/admin-data";
 import ApplicationDetailClient from "./detail-client";
 
 export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {
-  return APPLICATIONS.map((a) => ({ id: a.id }));
+  const applications = await fetchLiveApplications();
+  return applications.map((a) => ({ id: a.id }));
 }
 
 export default async function ApplicationDetail({
