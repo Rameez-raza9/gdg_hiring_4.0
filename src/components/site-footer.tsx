@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Mail, MapPin, Send, CheckCircle2, Loader2, ShieldCheck, FileText } from "lucide-react";
 import { TRACK_GROUPS } from "@/lib/brand";
+
+const FOOTER_LOGOS = ["l1", "l2", "l3", "l4", "l5"] as const;
 
 function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -72,6 +74,13 @@ export default function SiteFooter() {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
+  // Single bigger random footer logo
+  const [randomLogo, setRandomLogo] = useState<string>("l1");
+  useEffect(() => {
+    const chosen = FOOTER_LOGOS[Math.floor(Math.random() * FOOTER_LOGOS.length)];
+    setRandomLogo(chosen);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !message.trim()) return;
@@ -128,15 +137,13 @@ export default function SiteFooter() {
                 </a>
               ))}
             </div>
-            <div className="mt-5 flex items-center gap-2.5">
-              {(["l1", "l2", "l3", "l4", "l5"] as const).map((logo) => (
-                <img
-                  key={logo}
-                  src={`/assets/logos/${logo}.svg`}
-                  alt={`GDGoC Brand ${logo}`}
-                  className="h-7 w-auto opacity-75 hover:opacity-100 transition-opacity"
-                />
-              ))}
+            {/* Single Bigger Random Footer Logo */}
+            <div className="mt-5">
+              <img
+                src={`/assets/logos/${randomLogo}.svg`}
+                alt="GDGoC Chapter Emblem"
+                className="h-16 w-auto object-contain transition-transform hover:scale-105 duration-200"
+              />
             </div>
             <div className="mt-6 text-xs text-muted-foreground">
               <p className="flex items-center gap-2">

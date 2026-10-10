@@ -36,18 +36,29 @@ export function getRandomHeader() {
   return { id: getRandomHeaderKey() };
 }
 
+export const FOOTER_LOGO_KEYS = ["l1", "l2", "l3", "l4", "l5"] as const;
+export type FooterLogoKey = (typeof FOOTER_LOGO_KEYS)[number];
+
+export function getRandomFooterLogoKey(): FooterLogoKey {
+  return FOOTER_LOGO_KEYS[Math.floor(Math.random() * FOOTER_LOGO_KEYS.length)];
+}
+
 /**
  * Builds CID inline image attachments for Nodemailer.
  * Embeds:
  * - Exact chosen header image (h1, h2, h3, or h4) as 'emailHeader'
- * - Exact footer logo images (l1, l2, l3, l4, l5) from public/assets/logos/ as 'footerLogo1'..'footerLogo5'
+ * - Exact single bigger randomly chosen footer logo image (l1, l2, l3, l4, or l5) as 'footerLogo'
  */
-export function getEmailAttachments(headerKey: HeaderKey) {
+export function getEmailAttachments(headerKey: HeaderKey, footerLogoKey: FooterLogoKey = getRandomFooterLogoKey()) {
   const assetsDir = path.join(process.cwd(), "public", "assets");
 
   // Exact header image from public/assets/headers/
   const headerExt = fs.existsSync(path.join(assetsDir, "headers", `${headerKey}.png`)) ? "png" : "svg";
   const headerMime = headerExt === "png" ? "image/png" : "image/svg+xml";
+
+  // Exact single bigger footer logo image from public/assets/logos/
+  const logoExt = fs.existsSync(path.join(assetsDir, "logos", `${footerLogoKey}.png`)) ? "png" : "svg";
+  const logoMime = logoExt === "png" ? "image/png" : "image/svg+xml";
 
   const attachments: Array<{ filename: string; path: string; cid: string; contentType: string }> = [
     {
@@ -56,19 +67,13 @@ export function getEmailAttachments(headerKey: HeaderKey) {
       cid: "emailHeader",
       contentType: headerMime,
     },
-  ];
-
-  // Exact footer logo images l1, l2, l3, l4, l5 from public/assets/logos/
-  for (let i = 1; i <= 5; i++) {
-    const logoExt = fs.existsSync(path.join(assetsDir, "logos", `l${i}.png`)) ? "png" : "svg";
-    const logoMime = logoExt === "png" ? "image/png" : "image/svg+xml";
-    attachments.push({
-      filename: `l${i}.${logoExt}`,
-      path: path.join(assetsDir, "logos", `l${i}.${logoExt}`),
-      cid: `footerLogo${i}`,
+    {
+      filename: `${footerLogoKey}.${logoExt}`,
+      path: path.join(assetsDir, "logos", `${footerLogoKey}.${logoExt}`),
+      cid: "footerLogo",
       contentType: logoMime,
-    });
-  }
+    },
+  ];
 
   return attachments;
 }
@@ -413,24 +418,19 @@ function getEmailWrapper(contentHtml: string) {
           .footer-section {
             background-color: #f8fafc;
             border-top: 1px solid #e2e8f0;
-            padding: 24px 20px;
+            padding: 26px 20px;
             text-align: center;
             border-radius: 0 0 20px 20px;
           }
-          .footer-logos-table {
-            margin: 0 auto 16px auto;
-            border-collapse: collapse;
-          }
-          .footer-logo-td {
-            padding: 0 8px;
+          .footer-logo-box {
             text-align: center;
-            vertical-align: middle;
+            margin: 0 auto 16px auto;
           }
           .footer-logo-img {
-            display: block;
-            width: 34px;
+            display: inline-block;
+            width: 70px;
             height: auto;
-            max-height: 46px;
+            max-height: 96px;
             border: 0;
           }
           .footer-title {
@@ -466,27 +466,11 @@ function getEmailWrapper(contentHtml: string) {
             ${contentHtml}
           </div>
 
-          <!-- Exact Footer Logos (l1, l2, l3, l4, l5 from assets without editing) -->
+          <!-- Single Bigger Random Footer Logo (Exact image from l1 to l5 without editing) -->
           <div class="footer-section">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0" class="footer-logos-table" style="margin: 0 auto 16px auto;">
-              <tr>
-                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
-                  <img src="cid:footerLogo1" alt="GDGoC Logo 1" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
-                </td>
-                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
-                  <img src="cid:footerLogo2" alt="GDGoC Logo 2" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
-                </td>
-                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
-                  <img src="cid:footerLogo3" alt="GDGoC Logo 3" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
-                </td>
-                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
-                  <img src="cid:footerLogo4" alt="GDGoC Logo 4" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
-                </td>
-                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
-                  <img src="cid:footerLogo5" alt="GDGoC Logo 5" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
-                </td>
-              </tr>
-            </table>
+            <div class="footer-logo-box">
+              <img src="cid:footerLogo" alt="GDGoC Chapter Emblem" class="footer-logo-img" width="70" height="96" />
+            </div>
             <div class="footer-title">
               Google Developer Groups on Campus &bull; SVEC
             </div>
@@ -506,6 +490,7 @@ function getEmailWrapper(contentHtml: string) {
 export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
   const mailer = getMailer();
   const headerKey = getRandomHeaderKey();
+  const footerLogoKey = getRandomFooterLogoKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -523,10 +508,10 @@ export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
     </p>
   `);
 
-  const attachments = getEmailAttachments(headerKey);
+  const attachments = getEmailAttachments(headerKey, footerLogoKey);
 
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: Your GDGoC SVEC Application Link`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | FooterLogo: ${footerLogoKey} | Subject: Your GDGoC SVEC Application Link`);
     return true;
   }
 
@@ -559,6 +544,7 @@ export async function sendApplicationSubmittedEmail({
 }) {
   const mailer = getMailer();
   const headerKey = getRandomHeaderKey();
+  const footerLogoKey = getRandomFooterLogoKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -584,10 +570,10 @@ export async function sendApplicationSubmittedEmail({
     </p>
   `);
 
-  const attachments = getEmailAttachments(headerKey);
+  const attachments = getEmailAttachments(headerKey, footerLogoKey);
 
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: Application Received (${applicationId}) - GDGoC SVEC`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | FooterLogo: ${footerLogoKey} | Subject: Application Received (${applicationId}) - GDGoC SVEC`);
     return true;
   }
 
@@ -620,6 +606,7 @@ export async function sendInterviewFeedbackEmail({
 }) {
   const mailer = getMailer();
   const headerKey = getRandomHeaderKey();
+  const footerLogoKey = getRandomFooterLogoKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -659,10 +646,10 @@ export async function sendInterviewFeedbackEmail({
   }
 
   const html = getEmailWrapper(bodyHtml);
-  const attachments = getEmailAttachments(headerKey);
+  const attachments = getEmailAttachments(headerKey, footerLogoKey);
 
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: GDGoC SVEC Interview Update - ${studentName}`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | FooterLogo: ${footerLogoKey} | Subject: GDGoC SVEC Interview Update - ${studentName}`);
     return true;
   }
 
@@ -697,6 +684,7 @@ export async function sendAdminAccessRequestEmail({
 }) {
   const mailer = getMailer();
   const headerKey = getRandomHeaderKey();
+  const footerLogoKey = getRandomFooterLogoKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -724,10 +712,10 @@ export async function sendAdminAccessRequestEmail({
     </div>
   `);
 
-  const attachments = getEmailAttachments(headerKey);
+  const attachments = getEmailAttachments(headerKey, footerLogoKey);
 
   if (!mailer) {
-    console.log(`[Email Simulation] To: vinaysiddha19@gmail.com | Header: ${headerKey} | Subject: [RBAC Request] ${userName} requests ${requestedRole} access`);
+    console.log(`[Email Simulation] To: vinaysiddha19@gmail.com | Header: ${headerKey} | FooterLogo: ${footerLogoKey} | Subject: [RBAC Request] ${userName} requests ${requestedRole} access`);
     return true;
   }
 
