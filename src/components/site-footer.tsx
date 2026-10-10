@@ -128,6 +128,16 @@ export default function SiteFooter() {
                 </a>
               ))}
             </div>
+            <div className="mt-5 flex items-center gap-2.5">
+              {(["l1", "l2", "l3", "l4", "l5"] as const).map((logo) => (
+                <img
+                  key={logo}
+                  src={`/assets/logos/${logo}.svg`}
+                  alt={`GDGoC Brand ${logo}`}
+                  className="h-7 w-auto opacity-75 hover:opacity-100 transition-opacity"
+                />
+              ))}
+            </div>
             <div className="mt-6 text-xs text-muted-foreground">
               <p className="flex items-center gap-2">
                 <Mail className="size-3.5 text-blue-600" />

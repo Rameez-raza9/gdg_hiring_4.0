@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import nodemailer from "nodemailer";
 
 export const GMAIL_USER = process.env.GMAIL_USER || "gdgoncampussvec@gmail.com";
@@ -20,50 +22,55 @@ export function getMailer() {
 }
 
 /**
- * 4 Distinct Branded Headers with Unique Colors
- * h1: Google Blue gradient header
- * h2: Google Red vibrant gradient header
- * h3: Google Yellow warm gradient header
- * h4: Google Green emerald gradient header
+ * 4 Distinct Header Images (h1, h2, h3, h4) from public/assets/headers/
+ * Used exactly as provided without modifications.
  */
-export const HEADERS_CONFIG: Record<string, { id: string; name: string; primaryColor: string; bgGradient: string; svgFile: string }> = {
-  h1: {
-    id: "h1",
-    name: "Google Blue",
-    primaryColor: "#4285F4",
-    bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%)",
-    svgFile: "h1.svg",
-  },
-  h2: {
-    id: "h2",
-    name: "Google Red",
-    primaryColor: "#EA4335",
-    bgGradient: "linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #f87171 100%)",
-    svgFile: "h2.svg",
-  },
-  h3: {
-    id: "h3",
-    name: "Google Yellow",
-    primaryColor: "#FBBC04",
-    bgGradient: "linear-gradient(135deg, #854d0e 0%, #d97706 50%, #fbbf24 100%)",
-    svgFile: "h3.svg",
-  },
-  h4: {
-    id: "h4",
-    name: "Google Green",
-    primaryColor: "#34A853",
-    bgGradient: "linear-gradient(135deg, #14532d 0%, #16a34a 50%, #4ade80 100%)",
-    svgFile: "h4.svg",
-  },
-};
+export const HEADER_KEYS = ["h1", "h2", "h3", "h4"] as const;
+export type HeaderKey = (typeof HEADER_KEYS)[number];
+
+export function getRandomHeaderKey(): HeaderKey {
+  return HEADER_KEYS[Math.floor(Math.random() * HEADER_KEYS.length)];
+}
+
+export function getRandomHeader() {
+  return { id: getRandomHeaderKey() };
+}
 
 /**
- * Pick randomly from h1, h2, h3, h4 for each dispatched email
+ * Builds CID inline image attachments for Nodemailer.
+ * Embeds:
+ * - Exact chosen header image (h1, h2, h3, or h4) as 'emailHeader'
+ * - Exact footer logo images (l1, l2, l3, l4, l5) from public/assets/logos/ as 'footerLogo1'..'footerLogo5'
  */
-export function getRandomHeader() {
-  const keys = ["h1", "h2", "h3", "h4"];
-  const randKey = keys[Math.floor(Math.random() * keys.length)];
-  return HEADERS_CONFIG[randKey];
+export function getEmailAttachments(headerKey: HeaderKey) {
+  const assetsDir = path.join(process.cwd(), "public", "assets");
+
+  // Exact header image from public/assets/headers/
+  const headerExt = fs.existsSync(path.join(assetsDir, "headers", `${headerKey}.png`)) ? "png" : "svg";
+  const headerMime = headerExt === "png" ? "image/png" : "image/svg+xml";
+
+  const attachments: Array<{ filename: string; path: string; cid: string; contentType: string }> = [
+    {
+      filename: `${headerKey}.${headerExt}`,
+      path: path.join(assetsDir, "headers", `${headerKey}.${headerExt}`),
+      cid: "emailHeader",
+      contentType: headerMime,
+    },
+  ];
+
+  // Exact footer logo images l1, l2, l3, l4, l5 from public/assets/logos/
+  for (let i = 1; i <= 5; i++) {
+    const logoExt = fs.existsSync(path.join(assetsDir, "logos", `l${i}.png`)) ? "png" : "svg";
+    const logoMime = logoExt === "png" ? "image/png" : "image/svg+xml";
+    attachments.push({
+      filename: `l${i}.${logoExt}`,
+      path: path.join(assetsDir, "logos", `l${i}.${logoExt}`),
+      cid: `footerLogo${i}`,
+      contentType: logoMime,
+    });
+  }
+
+  return attachments;
 }
 
 /**
@@ -286,11 +293,11 @@ export function renderSingleMascotHtml(dot: { color: string; svg: string }) {
 
 /**
  * Clean White Website-Style Email Wrapper
- * Integrates Google Sans font, dynamic header banner (h1-h4), and neat official footer with logo
+ * - Uses exact header images (h1, h2, h3, h4) attached via CID (zero custom header CSS code)
+ * - Uses Google Sans font from public/fonts/ (Regular & Bold) with fallbacks
+ * - Uses exact footer logos (l1, l2, l3, l4, l5) attached via CID (zero custom code)
  */
-function getEmailWrapper(contentHtml: string, headerId?: string) {
-  const header = headerId && HEADERS_CONFIG[headerId] ? HEADERS_CONFIG[headerId] : getRandomHeader();
-
+function getEmailWrapper(contentHtml: string) {
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -298,60 +305,80 @@ function getEmailWrapper(contentHtml: string, headerId?: string) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GDGoC SVEC</title>
+        <!-- Google Sans Typography -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
         <style>
+          @font-face {
+            font-family: 'Google Sans';
+            font-style: normal;
+            font-weight: 400;
+            src: local('Google Sans Regular'), local('GoogleSans-Regular'), local('Google Sans'),
+                 url('https://fonts.gstatic.com/s/googlesans/v58/4UaGrENHsxJlGDuGo1OIlL3Kwp5MKg.woff2') format('woff2');
+          }
+          @font-face {
+            font-family: 'Google Sans';
+            font-style: normal;
+            font-weight: 700;
+            src: local('Google Sans Bold'), local('GoogleSans-Bold'), local('Google Sans'),
+                 url('https://fonts.gstatic.com/s/googlesans/v58/4UaGrENHsxJlGDuGo1OIlL3Nwp5MKg.woff2') format('woff2');
+          }
+
+          * {
+            box-sizing: border-box;
+          }
           body {
-            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Google Sans', 'GoogleSans-Regular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
             background-color: #f8fafc;
             color: #1e293b;
             margin: 0;
-            padding: 28px 14px;
+            padding: 24px 12px;
             -webkit-font-smoothing: antialiased;
           }
           .card {
             max-width: 580px;
             margin: 0 auto;
             background-color: #ffffff;
-            border-radius: 24px;
+            border-radius: 20px;
             overflow: hidden;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
           }
-          .header-banner {
-            background: ${header.bgGradient};
-            padding: 30px 24px;
-            text-align: center;
-            color: #ffffff;
-            position: relative;
-          }
-          .header-title {
-            font-size: 21px;
-            font-weight: 700;
+          .header-img-container {
+            width: 100%;
+            max-width: 580px;
             margin: 0;
-            letter-spacing: -0.02em;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.18);
+            padding: 0;
+            line-height: 0;
+            background-color: #ffffff;
+            border-radius: 20px 20px 0 0;
+            overflow: hidden;
           }
-          .header-subtitle {
-            font-size: 13px;
-            margin: 6px 0 0 0;
-            opacity: 0.92;
-            letter-spacing: 0.02em;
+          .header-img {
+            display: block;
+            width: 100%;
+            max-width: 580px;
+            height: auto;
+            border: 0;
+            border-radius: 20px 20px 0 0;
           }
           .body-content {
             padding: 32px 28px;
+            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
           }
           .title {
+            font-family: 'Google Sans', sans-serif !important;
             font-size: 22px;
             font-weight: 700;
             color: #0f172a;
-            letter-spacing: -0.03em;
+            letter-spacing: -0.02em;
             line-height: 1.3;
             margin: 0 0 16px 0;
             text-align: center;
           }
           .paragraph {
+            font-family: 'Google Sans', sans-serif !important;
             font-size: 15px;
             line-height: 1.65;
             color: #334155;
@@ -367,6 +394,7 @@ function getEmailWrapper(contentHtml: string, headerId?: string) {
             font-weight: 600;
             font-size: 14px;
             letter-spacing: -0.01em;
+            font-family: 'Google Sans', sans-serif !important;
             box-shadow: 0 4px 12px rgba(26, 115, 232, 0.28);
           }
           .btn-whatsapp {
@@ -379,50 +407,92 @@ function getEmailWrapper(contentHtml: string, headerId?: string) {
             font-weight: 600;
             font-size: 14px;
             letter-spacing: -0.01em;
+            font-family: 'Google Sans', sans-serif !important;
             box-shadow: 0 4px 12px rgba(37, 211, 102, 0.28);
           }
-          .footer {
+          .footer-section {
             background-color: #f8fafc;
             border-top: 1px solid #e2e8f0;
-            padding: 24px;
+            padding: 24px 20px;
             text-align: center;
+            border-radius: 0 0 20px 20px;
           }
-          .footer-logo {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 12px;
+          .footer-logos-table {
+            margin: 0 auto 16px auto;
+            border-collapse: collapse;
+          }
+          .footer-logo-td {
+            padding: 0 8px;
+            text-align: center;
+            vertical-align: middle;
+          }
+          .footer-logo-img {
+            display: block;
+            width: 34px;
+            height: auto;
+            max-height: 46px;
+            border: 0;
+          }
+          .footer-title {
+            font-family: 'Google Sans', sans-serif !important;
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+            letter-spacing: -0.01em;
           }
           .footer-meta {
+            font-family: 'Google Sans', sans-serif !important;
             font-size: 12px;
             line-height: 1.6;
             color: #64748b;
+          }
+          .footer-lead-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
           }
         </style>
       </head>
       <body>
         <div class="card">
-          <!-- Dynamic Branded Header Banner (h1-h4) -->
-          <div class="header-banner">
-            <h2 class="header-title">Google Developer Groups on Campus</h2>
-            <p class="header-subtitle">Sri Vasavi Engineering College &bull; GDGoC SVEC</p>
+          <!-- Exact Header Image (Randomly selected from h1, h2, h3, h4 without editing) -->
+          <div class="header-img-container">
+            <img src="cid:emailHeader" alt="GDGoC SVEC Header" class="header-img" width="580" />
           </div>
 
-          <!-- Main Content -->
+          <!-- Main Body Content -->
           <div class="body-content">
             ${contentHtml}
           </div>
 
-          <!-- Neat Footer with Official Logo & Contact Details -->
-          <div class="footer">
-            <div class="footer-logo">
-              <span style="font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">
-                &lt;&nbsp;/&gt; GDGoC SVEC
-              </span>
+          <!-- Exact Footer Logos (l1, l2, l3, l4, l5 from assets without editing) -->
+          <div class="footer-section">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" class="footer-logos-table" style="margin: 0 auto 16px auto;">
+              <tr>
+                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
+                  <img src="cid:footerLogo1" alt="GDGoC Logo 1" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
+                </td>
+                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
+                  <img src="cid:footerLogo2" alt="GDGoC Logo 2" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
+                </td>
+                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
+                  <img src="cid:footerLogo3" alt="GDGoC Logo 3" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
+                </td>
+                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
+                  <img src="cid:footerLogo4" alt="GDGoC Logo 4" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
+                </td>
+                <td class="footer-logo-td" style="padding: 0 8px; text-align: center; vertical-align: middle;">
+                  <img src="cid:footerLogo5" alt="GDGoC Logo 5" width="34" height="47" class="footer-logo-img" style="display: block; width: 34px; height: auto; max-height: 46px; border: 0;" />
+                </td>
+              </tr>
+            </table>
+            <div class="footer-title">
+              Google Developer Groups on Campus &bull; SVEC
             </div>
             <div class="footer-meta">
-              <strong>Sri Vasavi Engineering College</strong>, Pedatadepalli, Tadepalligudem<br>
-              Contact Chapter Lead: <a href="mailto:vinaysiddha19@gmail.com" style="color: #2563eb; text-decoration: none;">vinaysiddha19@gmail.com</a><br>
+              Sri Vasavi Engineering College, Pedatadepalli, Tadepalligudem<br>
+              Contact Chapter Lead: <a href="mailto:vinaysiddha19@gmail.com" class="footer-lead-link">vinaysiddha19@gmail.com</a><br>
               Eight tracks. One campus. Everyone building.
             </div>
           </div>
@@ -435,6 +505,7 @@ function getEmailWrapper(contentHtml: string, headerId?: string) {
 // 1. Home page Apply Link Email
 export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
   const mailer = getMailer();
+  const headerKey = getRandomHeaderKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -452,8 +523,10 @@ export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
     </p>
   `);
 
+  const attachments = getEmailAttachments(headerKey);
+
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Subject: Your GDGoC SVEC Application Link`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: Your GDGoC SVEC Application Link`);
     return true;
   }
 
@@ -463,6 +536,7 @@ export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
       to: toEmail,
       subject: "Your GDGoC SVEC Application Link",
       html,
+      attachments,
     });
     return true;
   } catch (err) {
@@ -484,6 +558,7 @@ export async function sendApplicationSubmittedEmail({
   whatsappGroupUrl?: string;
 }) {
   const mailer = getMailer();
+  const headerKey = getRandomHeaderKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -509,8 +584,10 @@ export async function sendApplicationSubmittedEmail({
     </p>
   `);
 
+  const attachments = getEmailAttachments(headerKey);
+
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Subject: Application Received (${applicationId}) - GDGoC SVEC`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: Application Received (${applicationId}) - GDGoC SVEC`);
     return true;
   }
 
@@ -520,6 +597,7 @@ export async function sendApplicationSubmittedEmail({
       to: toEmail,
       subject: `Application Received (${applicationId}) - GDGoC SVEC`,
       html,
+      attachments,
     });
     return true;
   } catch (err) {
@@ -541,6 +619,7 @@ export async function sendInterviewFeedbackEmail({
   communityUrl?: string;
 }) {
   const mailer = getMailer();
+  const headerKey = getRandomHeaderKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -580,9 +659,10 @@ export async function sendInterviewFeedbackEmail({
   }
 
   const html = getEmailWrapper(bodyHtml);
+  const attachments = getEmailAttachments(headerKey);
 
   if (!mailer) {
-    console.log(`[Email Simulation] To: ${toEmail} | Subject: GDGoC SVEC Interview Update - ${studentName}`);
+    console.log(`[Email Simulation] To: ${toEmail} | Header: ${headerKey} | Subject: GDGoC SVEC Interview Update - ${studentName}`);
     return true;
   }
 
@@ -592,6 +672,7 @@ export async function sendInterviewFeedbackEmail({
       to: toEmail,
       subject: `Update on your GDGoC SVEC Interview - ${studentName}`,
       html,
+      attachments,
     });
     return true;
   } catch (err) {
@@ -615,6 +696,7 @@ export async function sendAdminAccessRequestEmail({
   reason?: string;
 }) {
   const mailer = getMailer();
+  const headerKey = getRandomHeaderKey();
   const singleDot = getRandomDot();
   const mascotHtml = renderSingleMascotHtml(singleDot);
 
@@ -642,8 +724,10 @@ export async function sendAdminAccessRequestEmail({
     </div>
   `);
 
+  const attachments = getEmailAttachments(headerKey);
+
   if (!mailer) {
-    console.log(`[Email Simulation] To: vinaysiddha19@gmail.com | Subject: [RBAC Request] ${userName} requests ${requestedRole} access`);
+    console.log(`[Email Simulation] To: vinaysiddha19@gmail.com | Header: ${headerKey} | Subject: [RBAC Request] ${userName} requests ${requestedRole} access`);
     return true;
   }
 
@@ -654,6 +738,7 @@ export async function sendAdminAccessRequestEmail({
       replyTo: userEmail,
       subject: `[RBAC Request] ${userName} requests ${requestedRole} role`,
       html,
+      attachments,
     });
     return true;
   } catch (err) {
