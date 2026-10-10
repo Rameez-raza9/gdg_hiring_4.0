@@ -20,6 +20,53 @@ export function getMailer() {
 }
 
 /**
+ * 4 Distinct Branded Headers with Unique Colors
+ * h1: Google Blue gradient header
+ * h2: Google Red vibrant gradient header
+ * h3: Google Yellow warm gradient header
+ * h4: Google Green emerald gradient header
+ */
+export const HEADERS_CONFIG: Record<string, { id: string; name: string; primaryColor: string; bgGradient: string; svgFile: string }> = {
+  h1: {
+    id: "h1",
+    name: "Google Blue",
+    primaryColor: "#4285F4",
+    bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%)",
+    svgFile: "h1.svg",
+  },
+  h2: {
+    id: "h2",
+    name: "Google Red",
+    primaryColor: "#EA4335",
+    bgGradient: "linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #f87171 100%)",
+    svgFile: "h2.svg",
+  },
+  h3: {
+    id: "h3",
+    name: "Google Yellow",
+    primaryColor: "#FBBC04",
+    bgGradient: "linear-gradient(135deg, #854d0e 0%, #d97706 50%, #fbbf24 100%)",
+    svgFile: "h3.svg",
+  },
+  h4: {
+    id: "h4",
+    name: "Google Green",
+    primaryColor: "#34A853",
+    bgGradient: "linear-gradient(135deg, #14532d 0%, #16a34a 50%, #4ade80 100%)",
+    svgFile: "h4.svg",
+  },
+};
+
+/**
+ * Pick randomly from h1, h2, h3, h4 for each dispatched email
+ */
+export function getRandomHeader() {
+  const keys = ["h1", "h2", "h3", "h4"];
+  const randKey = keys[Math.floor(Math.random() * keys.length)];
+  return HEADERS_CONFIG[randKey];
+}
+
+/**
  * 12 Animated Mascot Dot SVGs (matching AnimatedDots.tsx 1 to 12)
  * Includes inline CSS keyframes for clients that support CSS animation,
  * and high-contrast vector fallback for static mail clients.
@@ -79,71 +126,57 @@ export const DOTS_1_TO_12_SVG: Record<number, { color: string; svg: string }> = 
     color: "#FBBC04",
     svg: `<svg viewBox="0 0 100 100" width="84" height="84" style="display:inline-block; vertical-align:middle;">
       <style>
-        @keyframes rot4 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .d4 { animation: rot4 16s linear infinite; transform-origin: center; }
+        @keyframes hop4 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+        .d4 { animation: hop4 2.1s ease-in-out infinite; }
       </style>
       <g class="d4">
-        <circle cx="50" cy="30" r="22" fill="#FBBC04"/>
-        <circle cx="70" cy="50" r="22" fill="#FBBC04"/>
-        <circle cx="50" cy="70" r="22" fill="#FBBC04"/>
-        <circle cx="30" cy="50" r="22" fill="#FBBC04"/>
-        <circle cx="50" cy="50" r="26" fill="#FBBC04"/>
+        <rect x="18" y="18" width="64" height="64" rx="20" fill="#FBBC04"/>
+        <circle cx="42" cy="50" r="5" fill="#0f172a"/>
+        <circle cx="58" cy="50" r="5" fill="#0f172a"/>
       </g>
-      <path d="M42 49 Q45 54 48 49" stroke="#0f172a" stroke-width="2.5" fill="none"/>
-      <path d="M52 49 Q55 54 58 49" stroke="#0f172a" stroke-width="2.5" fill="none"/>
     </svg>`,
   },
   5: {
-    color: "#6366F1",
+    color: "#4285F4",
     svg: `<svg viewBox="0 0 100 100" width="84" height="84" style="display:inline-block; vertical-align:middle;">
       <style>
-        @keyframes pulse5 { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-        .d5 { animation: pulse5 2s ease-in-out infinite; transform-origin: center; }
+        @keyframes squish5 { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.08, 0.92); } }
+        .d5 { animation: squish5 2.5s ease-in-out infinite; transform-origin: center bottom; }
       </style>
       <g class="d5">
-        <rect x="14" y="14" width="72" height="72" rx="28" fill="#6366F1"/>
-        <rect x="42" y="47" width="5" height="7" rx="2" fill="#0f172a"/>
-        <rect x="53" y="47" width="5" height="7" rx="2" fill="#0f172a"/>
+        <path d="M 50 12 C 72 12 86 28 86 50 C 86 72 72 88 50 88 C 28 88 14 72 14 50 C 14 28 28 12 50 12 Z" fill="#4285F4"/>
+        <circle cx="41" cy="48" r="5" fill="#0f172a"/>
+        <circle cx="59" cy="48" r="5" fill="#0f172a"/>
       </g>
     </svg>`,
   },
   6: {
-    color: "#FBBC04",
+    color: "#EA4335",
     svg: `<svg viewBox="0 0 100 100" width="84" height="84" style="display:inline-block; vertical-align:middle;">
       <style>
-        @keyframes hop6 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-        .d6 { animation: hop6 2.4s ease-in-out infinite; }
+        @keyframes blink6 { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+        .d6 { animation: blink6 3s infinite; transform-origin: center; }
       </style>
-      <g class="d6">
-        <circle cx="50" cy="50" r="32" fill="#FBBC04"/>
-        <circle cx="80" cy="50" r="9" fill="#FBBC04"/>
-        <circle cx="71" cy="71" r="9" fill="#FBBC04"/>
-        <circle cx="50" cy="80" r="9" fill="#FBBC04"/>
-        <circle cx="29" cy="71" r="9" fill="#FBBC04"/>
-        <circle cx="20" cy="50" r="9" fill="#FBBC04"/>
-        <circle cx="29" cy="29" r="9" fill="#FBBC04"/>
-        <circle cx="50" cy="20" r="9" fill="#FBBC04"/>
-        <circle cx="71" cy="29" r="9" fill="#FBBC04"/>
-        <circle cx="43" cy="50" r="4.5" fill="#0f172a"/>
-        <circle cx="57" cy="50" r="4.5" fill="#0f172a"/>
+      <g>
+        <circle cx="50" cy="50" r="42" fill="#EA4335"/>
+        <g class="d6">
+          <ellipse cx="42" cy="48" rx="4.5" ry="5.5" fill="#0f172a"/>
+          <ellipse cx="58" cy="48" rx="4.5" ry="5.5" fill="#0f172a"/>
+        </g>
       </g>
     </svg>`,
   },
   7: {
-    color: "#38BDF8",
+    color: "#34A853",
     svg: `<svg viewBox="0 0 100 100" width="84" height="84" style="display:inline-block; vertical-align:middle;">
       <style>
-        @keyframes hop7 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-        .d7 { animation: hop7 2.1s ease-in-out infinite; }
+        @keyframes tilt7 { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-8deg); } }
+        .d7 { animation: tilt7 2s ease-in-out infinite; transform-origin: center; }
       </style>
       <g class="d7">
-        <circle cx="50" cy="50" r="22" fill="#38BDF8"/>
-        <circle cx="64" cy="64" r="20" fill="#38BDF8"/>
-        <circle cx="36" cy="64" r="20" fill="#38BDF8"/>
-        <circle cx="36" cy="36" r="20" fill="#38BDF8"/>
-        <circle cx="64" cy="36" r="20" fill="#38BDF8"/>
-        <path d="M42 49 Q45 53 48 49" stroke="#0f172a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M52 49 Q55 53 58 49" stroke="#0f172a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <polygon points="50,14 86,82 14,82" fill="#34A853"/>
+        <circle cx="45" cy="58" r="4.5" fill="#0f172a"/>
+        <circle cx="55" cy="58" r="4.5" fill="#0f172a"/>
       </g>
     </svg>`,
   },
@@ -240,7 +273,6 @@ export function getRandomDot() {
 
 /**
  * Render ONLY the single cute animated mascot dot
- * No names, no labels, no extra clutter.
  */
 export function renderSingleMascotHtml(dot: { color: string; svg: string }) {
   return `
@@ -254,8 +286,11 @@ export function renderSingleMascotHtml(dot: { color: string; svg: string }) {
 
 /**
  * Clean White Website-Style Email Wrapper
+ * Integrates Google Sans font, dynamic header banner (h1-h4), and neat official footer with logo
  */
-function getEmailWrapper(contentHtml: string) {
+function getEmailWrapper(contentHtml: string, headerId?: string) {
+  const header = headerId && HEADERS_CONFIG[headerId] ? HEADERS_CONFIG[headerId] : getRandomHeader();
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -263,43 +298,49 @@ function getEmailWrapper(contentHtml: string) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GDGoC SVEC</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
         <style>
           body {
             font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #f8fafc;
             color: #1e293b;
             margin: 0;
-            padding: 32px 16px;
+            padding: 28px 14px;
             -webkit-font-smoothing: antialiased;
           }
           .card {
-            max-width: 560px;
+            max-width: 580px;
             margin: 0 auto;
             background-color: #ffffff;
             border-radius: 24px;
-            padding: 36px 32px;
+            overflow: hidden;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
           }
-          .brand-logo-dots {
-            display: inline-block;
-            margin-right: 10px;
-            vertical-align: middle;
+          .header-banner {
+            background: ${header.bgGradient};
+            padding: 30px 24px;
+            text-align: center;
+            color: #ffffff;
+            position: relative;
           }
-          .brand-dot {
-            display: inline-block;
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            margin-right: 3px;
-          }
-          .brand-name {
-            display: inline-block;
-            font-size: 17px;
+          .header-title {
+            font-size: 21px;
             font-weight: 700;
-            color: #0f172a;
+            margin: 0;
             letter-spacing: -0.02em;
-            vertical-align: middle;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.18);
+          }
+          .header-subtitle {
+            font-size: 13px;
+            margin: 6px 0 0 0;
+            opacity: 0.92;
+            letter-spacing: 0.02em;
+          }
+          .body-content {
+            padding: 32px 28px;
           }
           .title {
             font-size: 22px;
@@ -341,37 +382,49 @@ function getEmailWrapper(contentHtml: string) {
             box-shadow: 0 4px 12px rgba(37, 211, 102, 0.28);
           }
           .footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px dashed #e2e8f0;
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 24px;
+            text-align: center;
+          }
+          .footer-logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+          }
+          .footer-meta {
             font-size: 12px;
             line-height: 1.6;
             color: #64748b;
-            text-align: center;
           }
         </style>
       </head>
       <body>
         <div class="card">
-          <!-- Top Brand Header -->
-          <div style="margin-bottom: 20px; text-align: center;">
-            <div class="brand-logo-dots">
-              <span class="brand-dot" style="background-color: #4285F4;"></span>
-              <span class="brand-dot" style="background-color: #EA4335;"></span>
-              <span class="brand-dot" style="background-color: #FBBC04;"></span>
-              <span class="brand-dot" style="background-color: #34A853;"></span>
-            </div>
-            <span class="brand-name">GDGoC SVEC</span>
+          <!-- Dynamic Branded Header Banner (h1-h4) -->
+          <div class="header-banner">
+            <h2 class="header-title">Google Developer Groups on Campus</h2>
+            <p class="header-subtitle">Sri Vasavi Engineering College &bull; GDGoC SVEC</p>
           </div>
 
-          <!-- Main Body -->
-          ${contentHtml}
+          <!-- Main Content -->
+          <div class="body-content">
+            ${contentHtml}
+          </div>
 
-          <!-- Footer -->
+          <!-- Neat Footer with Official Logo & Contact Details -->
           <div class="footer">
-            <strong>Google Developer Groups on Campus</strong><br>
-            Sri Vasavi Engineering College, Tadepalligudem<br>
-            Eight tracks. One campus. Everyone building.
+            <div class="footer-logo">
+              <span style="font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">
+                &lt;&nbsp;/&gt; GDGoC SVEC
+              </span>
+            </div>
+            <div class="footer-meta">
+              <strong>Sri Vasavi Engineering College</strong>, Pedatadepalli, Tadepalligudem<br>
+              Contact Chapter Lead: <a href="mailto:vinaysiddha19@gmail.com" style="color: #2563eb; text-decoration: none;">vinaysiddha19@gmail.com</a><br>
+              Eight tracks. One campus. Everyone building.
+            </div>
           </div>
         </div>
       </body>
@@ -379,7 +432,7 @@ function getEmailWrapper(contentHtml: string) {
   `;
 }
 
-// 1. Home page Apply Link Email with 1 Random Animated Dot
+// 1. Home page Apply Link Email
 export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
   const mailer = getMailer();
   const singleDot = getRandomDot();
@@ -389,13 +442,13 @@ export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
     ${mascotHtml}
     <h1 class="title">Here is your link to apply</h1>
     <p class="paragraph" style="text-align: center;">
-      Thanks for your interest in joining <strong>GDGoC SVEC</strong>! Click the button below to fill out your application:
+      Thanks for your interest in joining <strong>GDGoC SVEC</strong>! Click the button below to start your application:
     </p>
     <div style="text-align: center; margin: 26px 0;">
       <a href="${applyUrl}" class="btn-primary">Apply Now &rarr;</a>
     </div>
     <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 18px;">
-      Remember to sign in with your Google account before submitting.
+      Remember to sign in with your Google account before submitting your application.
     </p>
   `);
 
@@ -418,7 +471,7 @@ export async function sendApplyLinkEmail(toEmail: string, applyUrl: string) {
   }
 }
 
-// 2. Application Submitted Email with 1 Random Animated Dot & WhatsApp Link
+// 2. Application Submitted Email with WhatsApp Link
 export async function sendApplicationSubmittedEmail({
   toEmail,
   studentName,
@@ -444,7 +497,7 @@ export async function sendApplicationSubmittedEmail({
       Your application has been received successfully (Ref: <strong style="font-family: monospace;">${applicationId}</strong>).
     </p>
     <p class="paragraph">
-      Please join our official WhatsApp community group for recruitment schedules, interview slots, and announcements:
+      Please join our official WhatsApp community group for recruitment schedules, interview slots, and chapter announcements:
     </p>
     <div style="text-align: center; margin: 26px 0;">
       <a href="${whatsappGroupUrl}" class="btn-whatsapp">
@@ -452,7 +505,7 @@ export async function sendApplicationSubmittedEmail({
       </a>
     </div>
     <p style="font-size: 13px; color: #64748b; text-align: center;">
-      Our leads will review your application and reach out soon.
+      Our leads will review your application and reach out shortly.
     </p>
   `);
 
@@ -475,7 +528,7 @@ export async function sendApplicationSubmittedEmail({
   }
 }
 
-// 3. Post-Interview Decision Email with 1 Random Animated Dot
+// 3. Post-Interview Decision Email
 export async function sendInterviewFeedbackEmail({
   toEmail,
   studentName,
@@ -515,7 +568,7 @@ export async function sendInterviewFeedbackEmail({
         Thank you for taking the time to interview with GDGoC SVEC.
       </p>
       <p class="paragraph">
-        If you are selected, you will receive an acceptance offer shortly. If not, don't worry — community is open to everyone! Follow our upcoming sessions and build with us:
+        If you are selected, you will receive an acceptance offer shortly. If not, don't worry — our community is open to everyone! Follow our upcoming sessions and build with us:
       </p>
       <div style="text-align: center; margin: 26px 0;">
         <a href="${communityUrl}" class="btn-primary">Follow Our Events &rarr;</a>
@@ -543,6 +596,68 @@ export async function sendInterviewFeedbackEmail({
     return true;
   } catch (err) {
     console.error("Failed to send interview feedback email:", err);
+    return false;
+  }
+}
+
+// 4. Admin Access Request Email sent to vinaysiddha19@gmail.com
+export async function sendAdminAccessRequestEmail({
+  userEmail,
+  userName,
+  currentRole = "Member",
+  requestedRole = "Reviewer",
+  reason = "",
+}: {
+  userEmail: string;
+  userName: string;
+  currentRole?: string;
+  requestedRole?: string;
+  reason?: string;
+}) {
+  const mailer = getMailer();
+  const singleDot = getRandomDot();
+  const mascotHtml = renderSingleMascotHtml(singleDot);
+
+  const html = getEmailWrapper(`
+    ${mascotHtml}
+    <h1 class="title">New RBAC Access Request 🛡️</h1>
+    <p class="paragraph">
+      Hi Vinay,
+    </p>
+    <p class="paragraph">
+      A user has requested elevated role privileges in the GDGoC SVEC Admin Portal:
+    </p>
+    <div style="background-color: #f1f5f9; padding: 18px; border-radius: 14px; margin: 18px 0; border: 1px solid #cbd5e1;">
+      <p style="margin: 4px 0; font-size: 14px;"><strong>User Name:</strong> ${userName}</p>
+      <p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> ${userEmail}</p>
+      <p style="margin: 4px 0; font-size: 14px;"><strong>Current Role:</strong> <span style="background: #e2e8f0; padding: 2px 8px; border-radius: 6px;">${currentRole}</span></p>
+      <p style="margin: 4px 0; font-size: 14px;"><strong>Requested Role:</strong> <span style="background: #dbeafe; color: #1e40af; font-weight: 600; padding: 2px 8px; border-radius: 6px;">${requestedRole}</span></p>
+      ${reason ? `<p style="margin: 8px 0 0 0; font-size: 13px; color: #475569;"><strong>Reason:</strong> ${reason}</p>` : ""}
+    </div>
+    <p class="paragraph">
+      You can grant or update their role directly in the Admin Panel:
+    </p>
+    <div style="text-align: center; margin: 26px 0;">
+      <a href="https://gdg-hiring-4-0.vercel.app/admin/users" class="btn-primary">Manage Users & RBAC &rarr;</a>
+    </div>
+  `);
+
+  if (!mailer) {
+    console.log(`[Email Simulation] To: vinaysiddha19@gmail.com | Subject: [RBAC Request] ${userName} requests ${requestedRole} access`);
+    return true;
+  }
+
+  try {
+    await mailer.sendMail({
+      from: `"GDGoC SVEC Portal" <${GMAIL_USER}>`,
+      to: "vinaysiddha19@gmail.com",
+      replyTo: userEmail,
+      subject: `[RBAC Request] ${userName} requests ${requestedRole} role`,
+      html,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to send admin access request email:", err);
     return false;
   }
 }

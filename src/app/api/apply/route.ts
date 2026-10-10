@@ -31,11 +31,17 @@ export async function POST(req: Request) {
   const submitted = new Date().toISOString().slice(0, 10);
   const tracksJson = JSON.stringify(data.tracks || []);
 
+  const otherClubsJson = JSON.stringify(data.otherClubs || []);
+  const extraLinksJson = JSON.stringify(data.extraLinks || []);
+
   try {
     await turso.execute({
       sql: `
-        INSERT INTO applications (id, name, email, phone, roll, branch, year, tracks, why, link, status, submitted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?)
+        INSERT INTO applications (
+          id, name, email, phone, roll, branch, year, tracks,
+          why, link, other_clubs, club_role, extra_links, status, submitted
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?)
       `,
       args: [
         id,
@@ -48,6 +54,9 @@ export async function POST(req: Request) {
         tracksJson,
         data.why || null,
         data.link || null,
+        otherClubsJson,
+        data.clubRole || null,
+        extraLinksJson,
         submitted,
       ],
     });

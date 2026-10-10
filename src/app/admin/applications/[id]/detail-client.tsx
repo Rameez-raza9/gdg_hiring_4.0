@@ -98,18 +98,54 @@ export default function ApplicationDetailClient({
             <CardHeader title="Why they want to join" />
             <div className="space-y-5 p-6">
               <p className="max-w-prose leading-relaxed text-foreground/90">{app.why}</p>
-              {app.link && (
-                <a
-                  href={app.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-sm transition hover:border-foreground/40 text-foreground"
-                >
-                  <ExternalLink className="size-3.5" /> Portfolio / GitHub
-                </a>
-              )}
+              
+              {/* Extra Links & Portfolio */}
+              <div className="flex flex-wrap gap-2.5 pt-2">
+                {app.link && (
+                  <a
+                    href={app.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3.5 py-2 text-xs font-medium transition hover:border-foreground/40 text-foreground"
+                  >
+                    <ExternalLink className="size-3.5 text-blue-600" /> Primary Portfolio / Link
+                  </a>
+                )}
+                {app.extraLinks && app.extraLinks.map((el, i) => (
+                  <a
+                    key={i}
+                    href={el.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3.5 py-2 text-xs font-medium transition hover:border-foreground/40 text-foreground"
+                  >
+                    <ExternalLink className="size-3.5 text-blue-600" /> {el.label}: {el.url.replace(/^https?:\/\//, "").slice(0, 24)}...
+                  </a>
+                ))}
+              </div>
             </div>
           </Card>
+
+          {/* College Clubs & Involvement */}
+          {(app.otherClubs && app.otherClubs.length > 0) && (
+            <Card>
+              <CardHeader title="Campus Club Memberships & Roles" />
+              <div className="p-6 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {app.otherClubs.map((club) => (
+                    <span key={club} className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-800">
+                      {club}
+                    </span>
+                  ))}
+                </div>
+                {app.clubRole && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Designated role in other clubs: <strong className="text-foreground">{app.clubRole}</strong>
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title={`Team reviews (${app.reviews.length})`} />

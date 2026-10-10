@@ -65,6 +65,9 @@ export type Application = {
   submitted: string; // ISO date
   why: string;
   link?: string;
+  otherClubs?: string[];
+  clubRole?: string;
+  extraLinks?: { label: string; url: string }[];
   reviews: Review[];
 };
 
@@ -251,6 +254,20 @@ export async function fetchLiveApplications(): Promise<Application[]> {
         tracks = [];
       }
 
+      let otherClubs: string[] = [];
+      try {
+        otherClubs = JSON.parse(String(r.other_clubs || "[]"));
+      } catch {
+        otherClubs = [];
+      }
+
+      let extraLinks: { label: string; url: string }[] = [];
+      try {
+        extraLinks = JSON.parse(String(r.extra_links || "[]"));
+      } catch {
+        extraLinks = [];
+      }
+
       return {
         id: String(r.id),
         name: String(r.name),
@@ -264,6 +281,9 @@ export async function fetchLiveApplications(): Promise<Application[]> {
         submitted: String(r.submitted || "2026-10-09"),
         why: String(r.why || ""),
         link: r.link ? String(r.link) : undefined,
+        otherClubs,
+        clubRole: r.club_role ? String(r.club_role) : undefined,
+        extraLinks,
         reviews: reviewsByApp[String(r.id)] || [],
       };
     });

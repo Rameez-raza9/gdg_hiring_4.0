@@ -17,13 +17,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar (becomes a top bar on small screens) */}
       <aside className="border-b border-border bg-card/40 p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r lg:p-5">
         <Link href="/admin" className="mb-4 flex items-center gap-2.5 px-2 text-base font-semibold tracking-tight lg:mb-8">
-          <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-            <i className="size-2 rounded-full" style={{ background: G.blue }} />
-            <i className="size-2 rounded-full" style={{ background: G.red }} />
-            <i className="size-2 rounded-full" style={{ background: G.yellow }} />
-            <i className="size-2 rounded-full" style={{ background: G.green }} />
-          </span>
-          GDGoC Admin
+          <img src="/assets/logos/main_logo.jpeg" alt="GDGoC SVEC" className="size-7 rounded-lg object-contain border border-border" />
+          <span>GDGoC Admin</span>
         </Link>
 
         <Suspense fallback={null}>
