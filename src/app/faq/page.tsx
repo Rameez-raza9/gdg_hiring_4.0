@@ -17,56 +17,102 @@ const CATEGORY_COLOR: Record<Category, string> = {
 };
 
 const FAQS: { q: string; a: string; c: Category }[] = [
-  {
-    c: "General",
-    q: "What is GDGoC SVEC?",
-    a: "Google Developer Groups on Campus at Sri Vasavi Engineering College is a student-run community that learns Google technologies together through workshops, study jams, talks and hackathons.",
-  },
-  {
-    c: "General",
-    q: "Do I need to be a computer science student?",
-    a: "No. Students from any branch are welcome. Non-technical tracks (Event Management, Public Relations & Outreach, Social Media & Marketing, Creative Design) don't need coding experience.",
-  },
-  {
-    c: "General",
-    q: "Which tracks can I follow?",
-    a: "Technical: GenAI & AIML, Cloud & DevOps, Web and App, and Coding and Programming. Non-Technical: Event Management, Public Relations & Outreach, Social Media & Marketing, and Creative Design. You can pick up to three when you apply.",
-  },
-  {
-    c: "Joining",
-    q: "How do I join?",
-    a: "Fill in the application form. It has three short steps: about you, your tracks, and why you want to join. We review applications and reach out by email.",
-  },
-  {
-    c: "Joining",
-    q: "Is there a membership fee?",
-    a: "Joining the community is free. If a specific event or workshop has a cost, it will be announced with the event details.",
-  },
-  {
-    c: "Joining",
-    q: "Can first-year students apply?",
-    a: "Yes. Every year is welcome, and many members start with no experience in their track.",
-  },
-  {
-    c: "Events",
-    q: "What kind of events do you run?",
-    a: "Hands-on workshops, Cloud Study Jams, speaker sessions, coding contests and hackathons, usually on campus.",
-  },
-  {
-    c: "Events",
-    q: "Where do I hear about upcoming events?",
-    a: "Event announcements go out by email to members and on our community page. Following our social accounts also works.",
-  },
-  {
-    c: "Projects",
-    q: "Can I build projects with the community?",
-    a: "Yes. Members form small teams around track projects, get feedback from leads, and demo what they build at community events.",
-  },
-  {
-    c: "Projects",
-    q: "I'm a complete beginner. Where do I start?",
-    a: "Pick one track, attend its next workshop, and ask your track lead for a first small project. Starting small is the plan.",
-  },
+
+{
+  c: "Joining",
+  q: "How do I join?",
+  a: "Fill in the application form. It has three short steps: about you, your tracks, and why you want to join. We review applications and reach out by email."
+},
+{
+  c: "Joining",
+  q: "Is there a membership fee?",
+  a: "Joining the community is free. If a specific event or workshop has a cost, it will be announced with the event details."
+},
+{
+  c: "Joining",
+  q: "Can first-year students apply?",
+  a: "Yes. Every year is welcome, and many members start with no experience in their track."
+},
+{
+  c: "Joining",
+  q: "When will applications open and close?",
+  a: "Application dates will be announced through the official GDGoC SVEC community channels. Follow our announcements to stay updated on deadlines."
+},
+{
+  c: "Joining",
+  q: "Is there an interview or selection round?",
+  a: "The selection process will be communicated by the organizing team. Check the official recruitment announcement for details about any interviews, assessments, or additional rounds."
+},
+{
+  c: "Joining",
+  q: "How many roles can I apply for?",
+  a: "You can apply for up to three roles across the Technical and Non-Technical wings. Your selections must include roles from both wings."
+},
+{
+  c: "Joining",
+  q: "Can I apply for roles in both Technical and Non-Technical wings?",
+  a: "Yes. You must select roles from both wings. You can choose either one Technical role and two Non-Technical roles, or two Technical roles and one Non-Technical role."
+},
+{
+  c: "Joining",
+  q: "Can I select all three roles from the Technical wing?",
+  a: "No. You cannot select all three roles from the Technical wing. Your application must include at least one Non-Technical role."
+},
+{
+  c: "Joining",
+  q: "Can I select all three roles from the Non-Technical wing?",
+  a: "No. You cannot select all three roles from the Non-Technical wing. Your application must include at least one Technical role."
+},
+{
+  c: "Joining",
+  q: "Can I choose two Technical roles and one Non-Technical role?",
+  a: "Yes. This is an allowed combination. You can select any two eligible Technical roles and one Non-Technical role."
+},
+{
+  c: "Joining",
+  q: "Can I choose one Technical role and two Non-Technical roles?",
+  a: "Yes. This is an allowed combination. You can select one Technical role and any two eligible Non-Technical roles."
+},
+{
+  c: "Joining",
+  q: "Do my three role preferences have to be from different clusters?",
+  a: "No. You may select roles from the same wing, provided your selections include at least one Technical role and at least one Non-Technical role. You cannot select all three from one wing."
+},
+{
+  c: "Joining",
+  q: "Can I edit my application after submitting it?",
+  a: "If you need to update your application after submission, contact the organizing team through the official communication channels. Changes depend on the application process."
+},
+{
+  c: "Joining",
+  q: "What should I write in the 'Why do you want to join?' section?",
+  a: "Explain your genuine interests, what you want to learn, why you selected your preferred roles, and how you hope to contribute to the community. Be specific and honest."
+},
+{
+  c: "Joining",
+  q: "Will beginners have an equal opportunity during selection?",
+  a: "We encourage applicants with different experience levels. Demonstrating curiosity, commitment, willingness to learn, and an interest in contributing can help communicate your potential."
+},
+{
+  c: "Joining",
+  q: "Can I apply if I have other college responsibilities?",
+  a: "Yes. You can apply while participating in other college activities. Consider your existing commitments and be prepared to manage your time and responsibilities effectively."
+},
+{
+  c: "Joining",
+  q: "What happens after I get selected?",
+  a: "Selected applicants will receive further instructions from the organizing team regarding onboarding, communication channels, role assignments, and upcoming activities."
+},
+{
+  c: "Joining",
+  q: "Can I apply again if I am not selected?",
+  a: "Future applications depend on the next recruitment cycle. You can continue developing your skills, participating in community activities open to you, and applying when recruitment reopens."
+},
+{
+  c: "Joining",
+  q: "Whom should I contact if I have trouble with the application form?",
+  a: "Reach out through the official GDGoC SVEC communication channels and explain the issue. Include the relevant details so the team can guide you."
+},
 ];
 
 function Item({ q, a, c, open, onToggle }: (typeof FAQS)[number] & { open: boolean; onToggle: () => void }) {
