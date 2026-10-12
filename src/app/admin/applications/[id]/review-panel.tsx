@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_COLOR, type Review, type Status } from "@/lib/admin-data";
 import { Card, CardHeader, StatusBadge, btnPrimary } from "@/components/admin/ui";
@@ -57,12 +57,14 @@ export default function ReviewPanel({
   const [status, setStatus] = useState<Status>(initialStatus);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const avg = ratings.every(Boolean) ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
 
   const save = async () => {
     if (saving) return;
     setSaving(true);
+    setError(null);
 
     const newStatus = decision || status;
     setStatus(newStatus);
@@ -95,15 +97,20 @@ export default function ReviewPanel({
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to save review");
+      }
       if (data?.review && onReviewAdded) {
         onReviewAdded(data.review, data.status);
       }
-    } catch (err) {
-      console.error("Error saving review:", err);
-    } finally {
-      setSaving(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
+    } catch (err: unknown) {
+      console.error("Error saving review:", err);
+      const msg = err instanceof Error ? err.message : "Failed to save review";
+      setError(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -164,11 +171,21 @@ export default function ReviewPanel({
           </div>
         </div>
 
+        {error && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 font-medium">
+            <AlertCircle className="size-4 shrink-0 text-red-400" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={save}
-          disabled={saving}
-          className={cn(btnPrimary, "w-full justify-center cursor-pointer")}
+          disabled={saving || saved}
+          className={cn(
+            btnPrimary,
+            "w-full justify-center cursor-pointer disabled:pointer-events-none disabled:opacity-60"
+          )}
         >
           {saving ? (
             <>

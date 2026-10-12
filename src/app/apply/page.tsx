@@ -813,12 +813,20 @@ export default function ApplyPage() {
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+                {generalError && (
+                  <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-500 font-medium">
+                    <AlertCircle className="size-4 shrink-0 text-red-500" />
+                    <span>{generalError}</span>
+                  </div>
+                )}
+
+                <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
                   {step > 0 ? (
                     <button
                       type="button"
+                      disabled={sending}
                       onClick={() => { sfx.playPop(); setStep(step - 1); }}
-                      className="text-sm text-muted-foreground hover:text-foreground cursor-pointer font-medium"
+                      className="text-sm text-muted-foreground hover:text-foreground cursor-pointer font-medium disabled:opacity-40 disabled:pointer-events-none"
                     >
                       &larr; Back
                     </button>
@@ -827,7 +835,7 @@ export default function ApplyPage() {
                     type="button"
                     onClick={next}
                     disabled={sending}
-                    className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:brightness-105 cursor-pointer disabled:opacity-50"
+                    className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:brightness-105 cursor-pointer disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed"
                   >
                     {sending ? (
                       <span className="flex items-center gap-2">

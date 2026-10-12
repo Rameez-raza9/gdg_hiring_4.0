@@ -88,14 +88,31 @@ export const APPLICATIONS: Application[] = [];
 
 /* ---------- Database Fetchers (Turso Cloud) ---------- */
 
-export async function fetchLiveApplications(): Promise<Application[]> {
+let _cachedApplications: { data: Application[]; expiresAt: number } | null = null;
+let _cachedUsers: { data: User[]; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 8000; // 8 seconds cache for server components & navigations
+
+export function invalidateAdminCache() {
+  _cachedApplications = null;
+  _cachedUsers = null;
+}
+
+export async function fetchLiveApplications(forceRefresh = false): Promise<Application[]> {
+  const now = Date.now();
+  if (!forceRefresh && _cachedApplications && _cachedApplications.expiresAt > now) {
+    return _cachedApplications.data;
+  }
+
   try {
     const [res, revRes] = await Promise.all([
       turso.execute("SELECT * FROM applications ORDER BY submitted DESC"),
       turso.execute("SELECT * FROM reviews ORDER BY created_at DESC"),
     ]);
 
-    if (!res.rows.length) return [];
+    if (!res.rows.length) {
+      _cachedApplications = { data: [], expiresAt: now + CACHE_TTL_MS };
+      return [];
+    }
 
     const reviewsByApp: Record<string, Review[]> = {};
 
@@ -112,7 +129,7 @@ export async function fetchLiveApplications(): Promise<Application[]> {
       });
     }
 
-    return res.rows.map((r) => {
+    const apps: Application[] = res.rows.map((r) => {
       let tracks: string[] = [];
       try {
         tracks = JSON.parse(String(r.tracks || "[]"));
@@ -153,13 +170,21 @@ export async function fetchLiveApplications(): Promise<Application[]> {
         reviews: reviewsByApp[String(r.id)] || [],
       };
     });
+
+    _cachedApplications = { data: apps, expiresAt: now + CACHE_TTL_MS };
+    return apps;
   } catch (error) {
     console.error("Failed to fetch live applications from Turso:", error);
     return [];
   }
 }
 
-export async function fetchLiveUsers(): Promise<User[]> {
+export async function fetchLiveUsers(forceRefresh = false): Promise<User[]> {
+  const now = Date.now();
+  if (!forceRefresh && _cachedUsers && _cachedUsers.expiresAt > now) {
+    return _cachedUsers.data;
+  }
+
   try {
     const res = await turso.execute(`
       SELECT * FROM users 
@@ -167,9 +192,12 @@ export async function fetchLiveUsers(): Promise<User[]> {
         CASE WHEN LOWER(email) = 'vinaysiddha19@gmail.com' THEN 0 ELSE 1 END,
         created_at ASC
     `);
-    if (!res.rows.length) return USERS;
+    if (!res.rows.length) {
+      _cachedUsers = { data: USERS, expiresAt: now + CACHE_TTL_MS };
+      return USERS;
+    }
 
-    return res.rows.map((u) => {
+    const liveUsers = res.rows.map((u) => {
       const email = String(u.email || "");
       const isSuperAdmin = email.trim().toLowerCase() === "vinaysiddha19@gmail.com";
       const role = (isSuperAdmin ? "Admin" : String(u.role || "Member")) as Role;
@@ -185,6 +213,9 @@ export async function fetchLiveUsers(): Promise<User[]> {
         color: colorFor(name),
       };
     });
+
+    _cachedUsers = { data: liveUsers, expiresAt: now + CACHE_TTL_MS };
+    return liveUsers;
   } catch (error) {
     console.error("Failed to fetch live users from Turso:", error);
     return USERS;

@@ -6,6 +6,7 @@ import DotsDock from "@/components/dots-dock";
 import SiteFooter from "@/components/site-footer";
 import HideOnAdmin from "@/components/hide-on-admin";
 import TeardropCursor from "@/components/teardrop-cursor";
+import { NavigationProgress } from "@/components/navigation-progress";
 import { SITE_NAME, SITE_DESCRIPTION } from "@/lib/constants";
 
 const googleSans = localFont({
@@ -38,6 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${googleSans.variable} font-sans`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-blue-100 selection:text-blue-900">
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <main>{children}</main>
         <Suspense fallback={null}>
           <HideOnAdmin>
