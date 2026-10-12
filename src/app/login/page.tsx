@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dot, G } from "@/components/dot";
 import { signInWithGoogle, initAnalytics } from "@/lib/firebase";
 
 const inputCls =
-  "w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-2 focus:ring-foreground/10";
+  "w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -21,13 +23,17 @@ export default function LoginPage() {
 
   useEffect(() => {
     initAnalytics();
-  }, []);
+    // Warm up routes for instant client navigation
+    router.prefetch("/admin");
+    router.prefetch("/");
+  }, [router]);
 
   // The mascot covers its eyes while the password is hidden and being typed.
   const shy = focusPw && !show;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || googleLoading) return;
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError("Enter a valid email.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
     setError("");
@@ -40,18 +46,27 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (data?.isAdmin || email.trim().toLowerCase() === "vinaysiddha19@gmail.com") {
-        window.location.href = "/admin";
+      const isAdmin = data?.isAdmin || email.trim().toLowerCase() === "vinaysiddha19@gmail.com";
+      if (isAdmin) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("gdg_admin_authorized", "true");
+          sessionStorage.setItem("gdg_admin_email", email.trim().toLowerCase());
+        }
+        router.push("/admin");
+        // Keep loading true while page unmounts/navigates
+        return;
       } else {
-        window.location.href = "/";
+        router.push("/");
+        return;
       }
     } catch {
       setError("Couldn't sign in. Check your details and try again.");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
+    if (googleLoading || loading) return;
     setError("");
     setGoogleLoading(true);
     try {
@@ -83,13 +98,21 @@ export default function LoginPage() {
       }
 
       if (isAdmin) {
-        window.location.href = "/admin";
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("gdg_admin_authorized", "true");
+          if (user.email) {
+            sessionStorage.setItem("gdg_admin_email", user.email.trim().toLowerCase());
+          }
+        }
+        router.push("/admin");
+        // Keep googleLoading true while page unmounts/navigates
+        return;
       } else {
-        window.location.href = "/";
+        router.push("/");
+        return;
       }
     } catch (err: any) {
       setError(err?.message || "Failed to sign in with Google.");
-    } finally {
       setGoogleLoading(false);
     }
   };
@@ -163,10 +186,17 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full rounded-xl border border-green-300/60 bg-[#74E38A] py-3 text-sm font-medium text-neutral-950 transition hover:brightness-95 disabled:opacity-60"
+                disabled={loading || googleLoading}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-green-300/60 bg-[#74E38A] py-3 text-sm font-medium text-neutral-950 transition hover:brightness-95 disabled:pointer-events-none disabled:opacity-60 cursor-pointer"
               >
-                {loading ? "Signing in..." : "Log in"}
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin text-neutral-950" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  "Log in"
+                )}
               </button>
             </form>
 

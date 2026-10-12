@@ -16,18 +16,31 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   // Request admin state
   const [requestSent, setRequestSent] = useState(false);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [requestRole, setRequestRole] = useState("Reviewer");
   const [requestReason, setRequestReason] = useState("");
 
   useEffect(() => {
+    // Read cache on client mount without causing SSR hydration mismatch
+    const cachedAuth = sessionStorage.getItem("gdg_admin_authorized");
+    if (cachedAuth === "true") {
+      setAuthorized(true);
+      setChecking(false);
+    }
+    const cachedEmail = sessionStorage.getItem("gdg_admin_email");
+    if (cachedEmail) setUserEmail(cachedEmail);
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       setUserEmail(user?.email || null);
       setUserName(user?.displayName || null);
 
       if (user?.email) {
         const cleanEmail = user.email.trim().toLowerCase();
+        sessionStorage.setItem("gdg_admin_email", cleanEmail);
+
         if (cleanEmail === "vinaysiddha19@gmail.com") {
           setAuthorized(true);
+          sessionStorage.setItem("gdg_admin_authorized", "true");
         } else {
           // Check DB role for granted Reviewer/Lead/Admin
           try {
@@ -37,18 +50,23 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
               const found = data.users?.find((u: { email: string }) => u.email.toLowerCase() === cleanEmail);
               if (found && (found.role === "Admin" || found.role === "Lead" || found.role === "Reviewer") && found.status === "Active") {
                 setAuthorized(true);
+                sessionStorage.setItem("gdg_admin_authorized", "true");
               } else {
                 setAuthorized(false);
+                sessionStorage.removeItem("gdg_admin_authorized");
               }
             } else {
               setAuthorized(false);
+              sessionStorage.removeItem("gdg_admin_authorized");
             }
           } catch {
             setAuthorized(false);
+            sessionStorage.removeItem("gdg_admin_authorized");
           }
         }
       } else {
         setAuthorized(false);
+        sessionStorage.removeItem("gdg_admin_authorized");
       }
       setChecking(false);
     });
@@ -58,6 +76,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const handleSendAdminRequest = async () => {
     if (!userEmail) return;
     setSendingRequest(true);
+    setRequestError(null);
     try {
       const res = await fetch("/api/auth/request-admin", {
         method: "POST",
@@ -72,9 +91,13 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
       if (res.ok) {
         setRequestSent(true);
+      } else {
+        const d = await res.json().catch(() => null);
+        setRequestError(d?.error || "Failed to submit request. Please try again.");
       }
     } catch (err) {
       console.error("Failed to send admin request:", err);
+      setRequestError("Network error. Could not send request.");
     } finally {
       setSendingRequest(false);
     }
@@ -82,15 +105,27 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-muted-foreground text-sm font-medium">
-        Verifying authorization...
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center smooth-fade-in">
+        <div className="relative mb-6 flex items-center justify-center">
+          <div className="size-16 rounded-2xl border border-border bg-card p-3 shadow-sm flex items-center justify-center">
+            <img src="/assets/logos/main_logo.jpeg" alt="GDGoC" className="size-10 object-contain rounded-lg" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 flex gap-1">
+            <span className="size-2 rounded-full bg-[#4285F4] animate-ping" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Loader2 className="size-4 animate-spin text-[#4285F4]" />
+          <span>Verifying authorization...</span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Securing GDGoC SVEC Admin Portal</p>
       </div>
     );
   }
 
   if (!authorized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white px-6 py-12">
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12 smooth-fade-in">
         <div className="max-w-md w-full rounded-3xl border border-border bg-card p-8 text-center shadow-lg">
           <div className="size-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center border border-amber-200 mb-4">
             <ShieldAlert className="size-8" />
@@ -150,6 +185,11 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
                       className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs outline-none text-foreground"
                     />
                   </div>
+                  {requestError && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-[11px] text-red-400 font-medium text-center">
+                      {requestError}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={handleSendAdminRequest}

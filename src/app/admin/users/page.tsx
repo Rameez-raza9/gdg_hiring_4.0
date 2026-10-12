@@ -5,7 +5,7 @@ import { Check, Loader2, Mail, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { G } from "@/lib/brand";
 import { USERS, type Role, type User, type UserStatus } from "@/lib/admin-data";
-import { Avatar, Card, PageHeader, StatCard, btnPrimary } from "@/components/admin/ui";
+import { Avatar, Card, PageHeader, StatCard, btnPrimary, Pagination, TableSkeleton } from "@/components/admin/ui";
 
 const ROLES: Role[] = ["Admin", "Lead", "Reviewer", "Member"];
 const ROLE_NOTE: Record<Role, string> = {
@@ -21,7 +21,9 @@ const STATUS_COLOR: Record<UserStatus, string> = {
 };
 
 const field =
-  "rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none focus:border-foreground/40";
+  "rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none transition focus:border-foreground/40";
+
+const CACHE_KEY = "gdg_cached_users";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>(USERS);
@@ -32,12 +34,30 @@ export default function UsersPage() {
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "All">("All");
   const [inviting, setInviting] = useState(false);
+  const [submittingInvite, setSubmittingInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("Member");
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Fetch live users from Turso on mount
   useEffect(() => {
     let active = true;
+
+    // Check client session cache
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setUsers(parsed);
+          setLoading(false);
+        }
+      }
+    } catch {}
+
     async function loadUsers() {
       try {
         const res = await fetch("/api/users");
@@ -45,6 +65,9 @@ export default function UsersPage() {
           const data = await res.json();
           if (active && Array.isArray(data.users) && data.users.length > 0) {
             setUsers(data.users);
+            try {
+              sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.users));
+            } catch {}
           }
         }
       } catch (err) {
@@ -58,6 +81,11 @@ export default function UsersPage() {
       active = false;
     };
   }, []);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setPage(1);
+  }, [q, roleFilter, pageSize]);
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -147,7 +175,9 @@ export default function UsersPage() {
   };
 
   const invite = async () => {
+    if (submittingInvite) return;
     if (!/^\S+@\S+\.\S+$/.test(inviteEmail)) return;
+    setSubmittingInvite(true);
     const name = inviteEmail.split("@")[0];
     const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
     const newId = `u_${Date.now()}`;
@@ -171,25 +201,28 @@ export default function UsersPage() {
           body: JSON.stringify({ id: newId, role: inviteRole }),
         });
       }
+
+      setUsers((us) => [
+        ...us,
+        {
+          id: newId,
+          name: capitalizedName,
+          email: inviteEmail,
+          role: inviteRole,
+          status: "Active",
+          lastActive: "Just invited",
+          color: G.blue,
+        },
+      ]);
+      showToast(`User ${inviteEmail} registered with role ${inviteRole}`);
+      setInviteEmail("");
+      setInviting(false);
     } catch (e) {
       console.error("Failed to sync invited user:", e);
+      showToast("Failed to add user. Try again.");
+    } finally {
+      setSubmittingInvite(false);
     }
-
-    setUsers((us) => [
-      ...us,
-      {
-        id: newId,
-        name: capitalizedName,
-        email: inviteEmail,
-        role: inviteRole,
-        status: "Active",
-        lastActive: "Just invited",
-        color: G.blue,
-      },
-    ]);
-    showToast(`User ${inviteEmail} registered with role ${inviteRole}`);
-    setInviteEmail("");
-    setInviting(false);
   };
 
   return (
@@ -222,16 +255,25 @@ export default function UsersPage() {
 
       <Card className="mt-4 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-          <label className="relative min-w-[14rem] flex-1">
+          <div className="relative min-w-[14rem] flex-1">
             <span className="sr-only">Search users</span>
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by name or email"
-              className={cn(field, "w-full pl-10")}
+              placeholder="Search by name or email..."
+              className={cn(field, "w-full pl-10 pr-9")}
             />
-          </label>
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by role">
             {(["All", ...ROLES] as const).map((r) => {
               const active = roleFilter === r;
@@ -242,9 +284,9 @@ export default function UsersPage() {
                   aria-selected={active}
                   onClick={() => setRoleFilter(r)}
                   className={cn(
-                    "rounded-full border px-3.5 py-2 text-sm transition",
+                    "rounded-full border px-3.5 py-2 text-sm transition cursor-pointer",
                     active
-                      ? "border-foreground bg-foreground text-background"
+                      ? "border-foreground bg-foreground text-background font-medium shadow-xs"
                       : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
                   )}
                 >
@@ -266,97 +308,112 @@ export default function UsersPage() {
                 <th className="px-6 py-3 text-right font-medium">Access</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((u) => {
-                const suspended = u.status === "Suspended";
-                const isLeadAdmin = u.email.toLowerCase() === "vinaysiddha19@gmail.com";
-                const isUpdating = savingId === u.id;
+            {loading ? (
+              <TableSkeleton rows={pageSize > 10 ? 10 : pageSize} columns={5} />
+            ) : (
+              <tbody className="divide-y divide-border">
+                {rows.slice((page - 1) * pageSize, page * pageSize).map((u) => {
+                  const suspended = u.status === "Suspended";
+                  const isLeadAdmin = u.email.toLowerCase() === "vinaysiddha19@gmail.com";
+                  const isUpdating = savingId === u.id;
 
-                return (
-                  <tr key={u.id} className={cn("transition-colors hover:bg-background/50", suspended && "opacity-60")}>
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={u.name} color={u.color} size={36} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium">{u.name}</p>
-                            {isLeadAdmin && (
-                              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800">
-                                Chapter Lead
-                              </span>
-                            )}
+                  return (
+                    <tr key={u.id} className={cn("transition-colors hover:bg-background/50", suspended && "opacity-60")}>
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={u.name} color={u.color} size={36} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate font-medium">{u.name}</p>
+                              {isLeadAdmin && (
+                                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800">
+                                  Chapter Lead
+                                </span>
+                              )}
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                           </div>
-                          <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <div className="relative inline-flex items-center">
-                        <select
-                          value={u.role}
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={u.role}
+                            disabled={isLeadAdmin || isUpdating}
+                            onChange={(e) => setRole(u.id, e.target.value as Role)}
+                            aria-label={`Role for ${u.name}`}
+                            className={cn(
+                              field,
+                              "py-2 font-medium cursor-pointer",
+                              isLeadAdmin && "cursor-not-allowed bg-muted/40 font-semibold text-blue-600",
+                            )}
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                          {isUpdating && (
+                            <Loader2 className="absolute right-2 size-3.5 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ background: STATUS_COLOR[u.status] }}
+                            aria-hidden="true"
+                          />
+                          {u.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3.5 text-muted-foreground">{u.lastActive}</td>
+                      <td className="px-6 py-3.5 text-right">
+                        <button
+                          role="switch"
                           disabled={isLeadAdmin || isUpdating}
-                          onChange={(e) => setRole(u.id, e.target.value as Role)}
-                          aria-label={`Role for ${u.name}`}
+                          aria-checked={!suspended}
+                          aria-label={`${suspended ? "Restore" : "Suspend"} ${u.name}`}
+                          onClick={() => toggleSuspend(u.id)}
                           className={cn(
-                            field,
-                            "py-2 font-medium cursor-pointer",
-                            isLeadAdmin && "cursor-not-allowed bg-muted/40 font-semibold text-blue-600",
+                            "relative h-6 w-11 rounded-full border transition-colors",
+                            isLeadAdmin ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+                            suspended ? "border-border bg-background" : "border-transparent bg-[#34A853]",
                           )}
                         >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                        {isUpdating && (
-                          <Loader2 className="absolute right-2 size-3.5 animate-spin text-muted-foreground" />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="size-2 rounded-full"
-                          style={{ background: STATUS_COLOR[u.status] }}
-                          aria-hidden="true"
-                        />
-                        {u.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3.5 text-muted-foreground">{u.lastActive}</td>
-                    <td className="px-6 py-3.5 text-right">
-                      <button
-                        role="switch"
-                        disabled={isLeadAdmin || isUpdating}
-                        aria-checked={!suspended}
-                        aria-label={`${suspended ? "Restore" : "Suspend"} ${u.name}`}
-                        onClick={() => toggleSuspend(u.id)}
-                        className={cn(
-                          "relative h-6 w-11 rounded-full border transition-colors",
-                          isLeadAdmin ? "cursor-not-allowed opacity-50" : "cursor-pointer",
-                          suspended ? "border-border bg-background" : "border-transparent bg-[#34A853]",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "absolute top-0.5 size-5 rounded-full bg-white transition-all",
-                            suspended ? "left-0.5 bg-muted-foreground" : "left-[22px]",
-                          )}
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+                          <span
+                            className={cn(
+                              "absolute top-0.5 size-5 rounded-full bg-white transition-all",
+                              suspended ? "left-0.5 bg-muted-foreground" : "left-[22px]",
+                            )}
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            )}
           </table>
-          {rows.length === 0 && (
+          {!loading && rows.length === 0 && (
             <p className="px-6 py-14 text-center text-sm text-muted-foreground">
-              {loading ? "Loading users from database..." : "No users match this search."}
+              No users match this search or filter.
             </p>
           )}
         </div>
+
+        {!loading && rows.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalItems={rows.length}
+            pageSize={pageSize}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(s) => setPageSize(s)}
+            pageSizeOptions={[10, 25, 50]}
+          />
+        )}
       </Card>
 
       {/* Invite dialog */}
@@ -426,9 +483,20 @@ export default function UsersPage() {
               <button
                 type="button"
                 onClick={invite}
-                className={btnPrimary}
+                disabled={submittingInvite}
+                className={cn(
+                  btnPrimary,
+                  "inline-flex items-center gap-2 disabled:pointer-events-none disabled:opacity-60 cursor-pointer"
+                )}
               >
-                Add user
+                {submittingInvite ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin text-neutral-950" />
+                    Adding user...
+                  </>
+                ) : (
+                  "Add user"
+                )}
               </button>
             </div>
           </div>
