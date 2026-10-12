@@ -42,6 +42,16 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const [currentUserRole, setCurrentUserRole] = useState<string>("Admin");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+
+  useEffect(() => {
+    const cachedRole = sessionStorage.getItem("gdg_admin_role");
+    const cachedEmail = sessionStorage.getItem("gdg_admin_email");
+    if (cachedRole) setCurrentUserRole(cachedRole);
+    if (cachedEmail) setCurrentUserEmail(cachedEmail.trim().toLowerCase());
+  }, []);
+
   // Fetch live users from Turso on mount
   useEffect(() => {
     let active = true;
@@ -88,13 +98,22 @@ export default function UsersPage() {
   }, [q, roleFilter, pageSize]);
 
   const rows = useMemo(() => {
+    // Reviewers only see their own user profile details
+    if (currentUserRole === "Reviewer") {
+      return users.filter(
+        (u) =>
+          u.email.toLowerCase() === currentUserEmail ||
+          (currentUserEmail && u.email.toLowerCase().includes(currentUserEmail))
+      );
+    }
+
     const s = q.trim().toLowerCase();
     return users.filter(
       (u) =>
         (roleFilter === "All" || u.role === roleFilter) &&
         (!s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s)),
     );
-  }, [users, q, roleFilter]);
+  }, [users, q, roleFilter, currentUserRole, currentUserEmail]);
 
   const count = (r: Role) => users.filter((u) => u.role === r).length;
 
@@ -228,8 +247,12 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users & RBAC"
-        description="Control roles and access permissions for chapter reviewers, leads, and members."
+        title={currentUserRole === "Reviewer" ? "Your Profile & Details" : "Users & RBAC"}
+        description={
+          currentUserRole === "Reviewer"
+            ? "Your active reviewer account and permissions."
+            : "Control roles and access permissions for chapter reviewers, leads, and members."
+        }
         actions={
           <div className="flex items-center gap-3">
             {feedback && (
@@ -238,20 +261,24 @@ export default function UsersPage() {
                 {feedback}
               </span>
             )}
-            <button className={btnPrimary} onClick={() => setInviting(true)}>
-              <Plus className="size-4" strokeWidth={2.6} />
-              Invite user
-            </button>
+            {currentUserRole === "Admin" && (
+              <button className={btnPrimary} onClick={() => setInviting(true)}>
+                <Plus className="size-4" strokeWidth={2.6} />
+                Invite user
+              </button>
+            )}
           </div>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Admins" value={count("Admin")} note={ROLE_NOTE.Admin} color={G.blue} />
-        <StatCard label="Leads" value={count("Lead")} note={ROLE_NOTE.Lead} color={G.red} />
-        <StatCard label="Reviewers" value={count("Reviewer")} note={ROLE_NOTE.Reviewer} color={G.yellow} />
-        <StatCard label="Members" value={count("Member")} note={ROLE_NOTE.Member} color={G.green} />
-      </div>
+      {currentUserRole !== "Reviewer" && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Admins" value={count("Admin")} note={ROLE_NOTE.Admin} color={G.blue} />
+          <StatCard label="Leads" value={count("Lead")} note={ROLE_NOTE.Lead} color={G.red} />
+          <StatCard label="Reviewers" value={count("Reviewer")} note={ROLE_NOTE.Reviewer} color={G.yellow} />
+          <StatCard label="Members" value={count("Member")} note={ROLE_NOTE.Member} color={G.green} />
+        </div>
+      )}
 
       <Card className="mt-4 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
@@ -339,13 +366,14 @@ export default function UsersPage() {
                         <div className="relative inline-flex items-center">
                           <select
                             value={u.role}
-                            disabled={isLeadAdmin || isUpdating}
+                            disabled={isLeadAdmin || isUpdating || currentUserRole !== "Admin"}
                             onChange={(e) => setRole(u.id, e.target.value as Role)}
                             aria-label={`Role for ${u.name}`}
                             className={cn(
                               field,
                               "py-2 font-medium cursor-pointer",
-                              isLeadAdmin && "cursor-not-allowed bg-muted/40 font-semibold text-blue-600",
+                              (isLeadAdmin || currentUserRole !== "Admin") &&
+                                "cursor-not-allowed bg-muted/40 font-semibold text-blue-600",
                             )}
                           >
                             {ROLES.map((r) => (

@@ -185,10 +185,18 @@ export function ApplicationFormModal({
 
     try {
       const method = isEditing ? "PATCH" : "POST";
+      const updaterName = typeof window !== "undefined" ? sessionStorage.getItem("gdg_admin_name") || "Panel Member" : "Panel Member";
+      const updaterEmail = typeof window !== "undefined" ? sessionStorage.getItem("gdg_admin_email") || "" : "";
+
       const res = await fetch("/api/applications", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          updaterName: isEditing ? updaterName : undefined,
+          updaterEmail: isEditing ? updaterEmail : undefined,
+          updateNote: isEditing ? `Application updated by ${updaterName}` : undefined,
+        }),
       });
 
       const data = await res.json();

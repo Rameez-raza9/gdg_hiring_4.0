@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, Loader2, Mail, Pencil, Phone, Trash2 } from "lucide-react";
-import { type Application, type Review, type Status, avgScore, fmtDate } from "@/lib/admin-data";
+import { ArrowLeft, ExternalLink, Loader2, Mail, Pencil, Phone, Trash2, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { type Application, type Review, type Status, avgScore, fmtDate, formatToIST, colorFor } from "@/lib/admin-data";
 import { Avatar, Card, CardHeader, ScoreDots, StatusBadge, TrackChip } from "@/components/admin/ui";
 import ReviewPanel from "./review-panel";
 import { ApplicationFormModal } from "@/components/admin/application-form-modal";
@@ -18,17 +19,58 @@ export default function ApplicationDetailClient({
   const [app, setApp] = useState<Application>(initialApplication);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string }>({
+    name: "",
+    email: "",
+  });
+
+  useEffect(() => {
+    const cachedName = sessionStorage.getItem("gdg_admin_name") || "";
+    const cachedEmail = sessionStorage.getItem("gdg_admin_email") || "";
+    if (cachedName || cachedEmail) {
+      setCurrentUser({
+        name: cachedName,
+        email: cachedEmail,
+      });
+    }
+  }, []);
 
   const handleReviewAdded = (newReview: Review, newStatus?: Status) => {
     setApp((prev) => {
-      // Replace existing review by same reviewer or append
-      const filtered = prev.reviews.filter((r) => r.reviewer !== newReview.reviewer);
+      // Replace existing review by same reviewer or replace placeholder
+      const newEmail = (newReview.reviewerEmail || "").toLowerCase().trim();
+      const newName = (newReview.reviewer || "").toLowerCase().trim();
+      const filtered = prev.reviews.filter((r) => {
+        const revEmail = (r.reviewerEmail || "").toLowerCase().trim();
+        const revName = (r.reviewer || "").toLowerCase().trim();
+        if (newEmail && revEmail && newEmail === revEmail) return false;
+        if (newName && revName && newName === revName) return false;
+        return true;
+      });
       const updatedReviews = [newReview, ...filtered];
-      return {
+      const updatedStatus = newStatus || prev.status;
+      const updatedApp = {
         ...prev,
-        status: newStatus || prev.status,
+        status: updatedStatus,
         reviews: updatedReviews,
       };
+
+      // Also sync session cache so navigating back reflects "Interview" immediately
+      try {
+        const cached = sessionStorage.getItem("gdg_cached_applications");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const idx = parsed.findIndex((a: Application) => a.id === prev.id);
+            if (idx !== -1) {
+              parsed[idx] = updatedApp;
+              sessionStorage.setItem("gdg_cached_applications", JSON.stringify(parsed));
+            }
+          }
+        }
+      } catch {}
+
+      return updatedApp;
     });
   };
 
@@ -90,8 +132,25 @@ export default function ApplicationDetailClient({
 
   const score = avgScore(app);
   const timeline = [
-    { label: "Application submitted", date: app.submitted },
-    ...app.reviews.map((r) => ({ label: `Reviewed by ${r.reviewer}`, date: r.date })),
+    { label: "Application submitted", date: app.submitted, dateDisplay: formatToIST(app.submitted) },
+    ...app.reviews.map((r) => {
+      const isMe =
+        Boolean(currentUser.email && r.reviewerEmail && r.reviewerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+        Boolean(currentUser.name && r.reviewer && r.reviewer.toLowerCase() === currentUser.name.toLowerCase());
+
+      const displayName =
+        (r.reviewer && r.reviewer !== "Vinay Siddha" && r.reviewer !== "Reviewer")
+          ? r.reviewer
+          : (r.reviewerEmail || "Panel Reviewer");
+
+      const reviewerLabel = isMe ? "You" : displayName;
+
+      return {
+        label: `Evaluated by ${reviewerLabel}`,
+        date: r.createdAt || r.date,
+        dateDisplay: formatToIST(r.createdAt || r.date),
+      };
+    }),
   ].sort((x, y) => x.date.localeCompare(y.date));
 
   const facts = [
@@ -241,22 +300,59 @@ export default function ApplicationDetailClient({
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border">
-                {app.reviews.map((r, idx) => (
-                  <li key={`${r.reviewer}-${idx}`} className="flex gap-4 p-6 transition-all duration-300">
-                    <Avatar name={r.reviewer} color={r.reviewerColor} size={36} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-medium">{r.reviewer}</p>
-                        <ScoreDots score={r.score} size={7} />
+                {app.reviews.map((r, idx) => {
+                  const isCurrentReviewer =
+                    Boolean(
+                      (currentUser.email && r.reviewerEmail && r.reviewerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+                      (currentUser.name && r.reviewer && r.reviewer.toLowerCase() === currentUser.name.toLowerCase())
+                    );
+
+                  const displayName =
+                    (r.reviewer && r.reviewer !== "Vinay Siddha" && r.reviewer !== "Reviewer")
+                      ? r.reviewer
+                      : (r.reviewerEmail || "Panel Reviewer");
+
+                  const reviewerColor = colorFor(displayName);
+
+                  return (
+                    <li
+                      key={`${displayName}-${r.createdAt || r.date}-${idx}`}
+                      className={cn(
+                        "flex gap-4 p-6 transition-all duration-300",
+                        isCurrentReviewer && "bg-blue-500/5 rounded-2xl border border-blue-500/20 my-2"
+                      )}
+                    >
+                      <Avatar name={displayName} color={reviewerColor} size={38} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <span>{displayName}</span>
+                            {isCurrentReviewer ? (
+                              <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded-md">
+                                Your Review
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+                                Panel Review
+                              </span>
+                            )}
+                          </p>
+                          <ScoreDots score={r.score} size={7} />
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground/90">{r.note || "Candidate evaluated."}</p>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs border-t border-border/60 pt-2 text-muted-foreground">
+                          <span className="flex items-center gap-1.5 font-medium text-foreground/80">
+                            <Clock className="size-3 text-[#4285F4]" />
+                            {formatToIST(r.createdAt || r.date)}
+                          </span>
+                          <span>
+                            Recommendation: <strong className="text-foreground font-semibold">{r.recommend}</strong>
+                          </span>
+                        </div>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{r.note}</p>
-                      <p className="mt-2.5 text-xs text-muted-foreground/80">
-                        {fmtDate(r.date)} · Recommends:{" "}
-                        <span className="text-foreground font-medium">{r.recommend}</span>
-                      </p>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
@@ -266,6 +362,7 @@ export default function ApplicationDetailClient({
           <ReviewPanel
             applicationId={app.id}
             initialStatus={app.status}
+            existingReviews={app.reviews}
             onReviewAdded={handleReviewAdded}
           />
 
@@ -282,8 +379,11 @@ export default function ApplicationDetailClient({
                   )}
                   <span className="relative mt-1.5 size-[11px] shrink-0 rounded-full bg-[#4285F4]" aria-hidden="true" />
                   <div>
-                    <p className="text-sm">{t.label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{fmtDate(t.date)}</p>
+                    <p className="text-sm font-medium">{t.label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="size-3 text-[#34A853]" />
+                      {t.dateDisplay || formatToIST(t.date)}
+                    </p>
                   </div>
                 </li>
               ))}

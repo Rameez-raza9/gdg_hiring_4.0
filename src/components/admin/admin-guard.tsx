@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert, LogIn, ArrowLeft, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { btnPrimary } from "./ui";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("Admin");
 
   // Request admin state
   const [requestSent, setRequestSent] = useState(false);
@@ -23,54 +25,62 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     // Read cache on client mount without causing SSR hydration mismatch
     const cachedAuth = sessionStorage.getItem("gdg_admin_authorized");
-    if (cachedAuth === "true") {
+    const cachedEmail = sessionStorage.getItem("gdg_admin_email");
+    const cachedName = sessionStorage.getItem("gdg_admin_name");
+    const cachedRole = sessionStorage.getItem("gdg_admin_role");
+
+    if (cachedEmail) setUserEmail(cachedEmail);
+    if (cachedName) setUserName(cachedName);
+    if (cachedRole) setUserRole(cachedRole);
+
+    if (cachedAuth === "true" && cachedEmail && cachedRole !== "Member") {
       setAuthorized(true);
       setChecking(false);
+      return;
     }
-    const cachedEmail = sessionStorage.getItem("gdg_admin_email");
-    if (cachedEmail) setUserEmail(cachedEmail);
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setUserEmail(user?.email || null);
-      setUserName(user?.displayName || null);
+    if (!cachedEmail || cachedRole === "Member") {
+      setAuthorized(false);
+      setChecking(false);
+      return;
+    }
 
-      if (user?.email) {
-        const cleanEmail = user.email.trim().toLowerCase();
-        sessionStorage.setItem("gdg_admin_email", cleanEmail);
-
+    // Verify against Turso database
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((data) => {
+        const cleanEmail = cachedEmail.trim().toLowerCase();
         if (cleanEmail === "vinaysiddha19@gmail.com") {
           setAuthorized(true);
           sessionStorage.setItem("gdg_admin_authorized", "true");
-        } else {
-          // Check DB role for granted Reviewer/Lead/Admin
-          try {
-            const res = await fetch("/api/users");
-            if (res.ok) {
-              const data = await res.json();
-              const found = data.users?.find((u: { email: string }) => u.email.toLowerCase() === cleanEmail);
-              if (found && (found.role === "Admin" || found.role === "Lead" || found.role === "Reviewer") && found.status === "Active") {
-                setAuthorized(true);
-                sessionStorage.setItem("gdg_admin_authorized", "true");
-              } else {
-                setAuthorized(false);
-                sessionStorage.removeItem("gdg_admin_authorized");
-              }
-            } else {
-              setAuthorized(false);
-              sessionStorage.removeItem("gdg_admin_authorized");
-            }
-          } catch {
-            setAuthorized(false);
-            sessionStorage.removeItem("gdg_admin_authorized");
-          }
+          return;
         }
-      } else {
+
+        const found = data.users?.find(
+          (u: { email: string }) => u.email.toLowerCase() === cleanEmail
+        );
+
+        if (
+          found &&
+          ["Admin", "Lead", "Reviewer"].includes(found.role) &&
+          found.status === "Active"
+        ) {
+          setAuthorized(true);
+          sessionStorage.setItem("gdg_admin_authorized", "true");
+          sessionStorage.setItem("gdg_admin_name", found.name);
+          sessionStorage.setItem("gdg_admin_role", found.role);
+          if (found.photo_url) sessionStorage.setItem("gdg_admin_photo", found.photo_url);
+        } else {
+          setAuthorized(false);
+          sessionStorage.removeItem("gdg_admin_authorized");
+        }
+      })
+      .catch(() => {
         setAuthorized(false);
-        sessionStorage.removeItem("gdg_admin_authorized");
-      }
-      setChecking(false);
-    });
-    return () => unsub();
+      })
+      .finally(() => {
+        setChecking(false);
+      });
   }, []);
 
   const handleSendAdminRequest = async () => {
@@ -230,6 +240,62 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         </div>
       </div>
     );
+  }
+
+  // Role-Based Access Control (RBAC) route restrictions
+  if (userRole === "Reviewer") {
+    // If on /admin overview, seamlessly redirect to applications
+    if (pathname === "/admin") {
+      router.replace("/admin/applications");
+      return null;
+    }
+
+    const isAppPath = pathname.startsWith("/admin/applications");
+    const isUsersPath = pathname === "/admin/users";
+
+    if (!isAppPath && !isUsersPath) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+          <div className="size-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4">
+            <ShieldAlert className="size-8" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground">Reviewer Access Restricted</h2>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md leading-relaxed">
+            As a Reviewer, you only have access to Candidate Applications and your own profile details.
+          </p>
+          <Link
+            href="/admin/applications"
+            className="mt-5 rounded-xl bg-[#4285F4] px-5 py-2.5 text-xs font-semibold text-white transition hover:brightness-110"
+          >
+            Go to Applications
+          </Link>
+        </div>
+      );
+    }
+  }
+
+  if (userRole === "Lead") {
+    // Lead has access to analytics, overview, applications, reviews, interview plan, attendance
+    // Restrict broadcast
+    if (pathname === "/admin/broadcast") {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+          <div className="size-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4">
+            <ShieldAlert className="size-8" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground">Admin Only Feature</h2>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md leading-relaxed">
+            Broadcast emails are restricted to Chapter Administrators.
+          </p>
+          <Link
+            href="/admin/analytics"
+            className="mt-5 rounded-xl bg-[#4285F4] px-5 py-2.5 text-xs font-semibold text-white transition hover:brightness-110"
+          >
+            Go to Analytics
+          </Link>
+        </div>
+      );
+    }
   }
 
   return <>{children}</>;

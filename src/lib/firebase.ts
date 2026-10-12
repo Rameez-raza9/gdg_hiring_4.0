@@ -6,7 +6,6 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { getAnalytics, isSupported } from "firebase/analytics";
 
 export const firebaseConfig = {
   apiKey:
@@ -29,19 +28,11 @@ export const firebaseConfig = {
     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-S1H8DGC1ZE",
 };
 
-// Initialize Firebase singleton
+// Initialize Firebase client singleton
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
-
-// Analytics (Client-side only)
-export const initAnalytics = async () => {
-  if (typeof window !== "undefined" && (await isSupported())) {
-    return getAnalytics(app);
-  }
-  return null;
-};
 
 export async function signInWithGoogle(): Promise<{
   user: User | null;
@@ -52,7 +43,7 @@ export async function signInWithGoogle(): Promise<{
     return { user: result.user, error: null };
   } catch (error: any) {
     console.error("Firebase Google sign in error:", error);
-    return { user: null, error: error?.message || "Google sign-in failed" };
+    return { user: null, error: error?.message || "Google sign-in was canceled or failed." };
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_COLOR, type Review, type Status } from "@/lib/admin-data";
@@ -45,12 +45,19 @@ function Rating({
 export default function ReviewPanel({
   applicationId,
   initialStatus,
+  existingReviews = [],
   onReviewAdded,
 }: {
   applicationId: string;
   initialStatus: Status;
+  existingReviews?: Review[];
   onReviewAdded?: (newReview: Review, newStatus?: Status) => void;
 }) {
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string }>({
+    name: "",
+    email: "",
+  });
+
   const [ratings, setRatings] = useState<number[]>(CRITERIA.map(() => 0));
   const [note, setNote] = useState("");
   const [decision, setDecision] = useState<Status | null>(null);
@@ -58,6 +65,65 @@ export default function ReviewPanel({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPopulated, setIsPopulated] = useState(false);
+
+  useEffect(() => {
+    const cachedName = sessionStorage.getItem("gdg_admin_name") || "";
+    const cachedEmail = sessionStorage.getItem("gdg_admin_email") || "";
+    if (cachedName || cachedEmail) {
+      setCurrentUser({
+        name: cachedName || "",
+        email: cachedEmail || "",
+      });
+    }
+
+    const userEmail = cachedEmail.toLowerCase().trim();
+    const userName = cachedName.toLowerCase().trim();
+
+    // 1. Find if this logged-in person already has a review
+    let matchedReview = existingReviews.find((r) => {
+      const revEmail = (r.reviewerEmail || "").toLowerCase().trim();
+      const revName = (r.reviewer || "").toLowerCase().trim();
+      return (
+        (userEmail && revEmail === userEmail) ||
+        (userName && revName === userName)
+      );
+    });
+
+    // 2. If no direct match by name/email, but the application was already reviewed,
+    // pre-fill the review details so the reviewer sees the candidate's evaluations!
+    if (!matchedReview && existingReviews.length > 0) {
+      matchedReview = existingReviews[0];
+    }
+
+    if (matchedReview) {
+      if (
+        matchedReview.ratings &&
+        matchedReview.ratings.length === 4 &&
+        matchedReview.ratings.some((n) => n > 0)
+      ) {
+        setRatings(matchedReview.ratings);
+      } else if (matchedReview.score) {
+        setRatings([
+          matchedReview.score,
+          matchedReview.score,
+          matchedReview.score,
+          matchedReview.score,
+        ]);
+      }
+      if (matchedReview.note) {
+        setNote(matchedReview.note);
+      }
+      if (matchedReview.decision && DECISIONS.includes(matchedReview.decision as Status)) {
+        setDecision(matchedReview.decision as Status);
+      } else if (matchedReview.recommend === "Yes") {
+        setDecision("Accepted");
+      } else if (matchedReview.recommend === "No") {
+        setDecision("Rejected");
+      }
+      setIsPopulated(true);
+    }
+  }, [existingReviews]);
 
   const avg = ratings.every(Boolean) ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
 
@@ -66,21 +132,29 @@ export default function ReviewPanel({
     setSaving(true);
     setError(null);
 
-    const newStatus = decision || status;
-    setStatus(newStatus);
+    const reviewerName = currentUser.name || currentUser.email || "Panel Reviewer";
+    const reviewerEmail = currentUser.email || "";
+
+    // If an explicit decision was picked, use it.
+    // If no decision was picked, but status is "New", automatically advance to "Interview"!
+    const effectiveDecision: Status = decision || (status === "New" ? "Interview" : status);
+    setStatus(effectiveDecision);
 
     const fallbackReview: Review = {
-      reviewer: "Vinay Siddha",
+      reviewer: reviewerName,
+      reviewerEmail,
       reviewerColor: "#4285F4",
       score: Math.max(1, Math.round(avg || 4)),
-      recommend: (decision === "Accepted" ? "Yes" : decision === "Rejected" ? "No" : "Maybe") as "Yes" | "Maybe" | "No",
+      ratings,
+      decision: effectiveDecision,
+      recommend: (effectiveDecision === "Accepted" ? "Yes" : effectiveDecision === "Rejected" ? "No" : "Maybe") as "Yes" | "Maybe" | "No",
       note: note.trim() || "Candidate evaluated during review cycle.",
       date: new Date().toISOString().slice(0, 10),
     };
 
     // Instant optimistic update on the parent page
     if (onReviewAdded) {
-      onReviewAdded(fallbackReview, decision || undefined);
+      onReviewAdded(fallbackReview, effectiveDecision);
     }
 
     try {
@@ -89,11 +163,11 @@ export default function ReviewPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           applicationId,
-          reviewer: "Vinay Siddha",
-          reviewerEmail: "vinaysiddha19@gmail.com",
+          reviewer: reviewerName,
+          reviewerEmail,
           ratings,
           note: note.trim(),
-          decision,
+          decision: effectiveDecision,
         }),
       });
       const data = await res.json();
@@ -101,7 +175,7 @@ export default function ReviewPanel({
         throw new Error(data?.error || "Failed to save review");
       }
       if (data?.review && onReviewAdded) {
-        onReviewAdded(data.review, data.status);
+        onReviewAdded(data.review, data.status || effectiveDecision);
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -118,6 +192,26 @@ export default function ReviewPanel({
     <Card>
       <CardHeader title="Your review" action={<StatusBadge status={status} />} />
       <div className="space-y-5 p-6">
+        <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/60 px-3.5 py-2 text-xs">
+          <span className="text-muted-foreground">Logged in Reviewer:</span>
+          <span className="font-medium text-foreground flex items-center gap-1.5 truncate max-w-[240px]">
+            <span className="size-2 rounded-full bg-[#4285F4] shrink-0" />
+            <span className="truncate">{currentUser.name || currentUser.email || "Panel Reviewer"}</span>
+          </span>
+        </div>
+
+        {isPopulated && (
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-400 flex items-center justify-between">
+            <span>📝 Candidate evaluation details loaded</span>
+            <span className="text-[10px] text-blue-300 font-medium">Editable</span>
+          </div>
+        )}
+
+        {status === "New" && (
+          <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 px-3 py-2 text-xs text-purple-300">
+            💡 Saving this review will automatically advance applicant from <strong>New</strong> to <strong>Interview</strong>.
+          </div>
+        )}
         {CRITERIA.map((c, i) => (
           <Rating
             key={c}

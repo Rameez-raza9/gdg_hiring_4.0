@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, CheckSquare, ClipboardCheck, Inbox, LayoutDashboard, Megaphone, Users, Sparkles, type LucideIcon } from "lucide-react";
@@ -19,9 +20,32 @@ const ITEMS: { href: string; label: string; Icon: LucideIcon; color: string }[] 
 
 export default function AdminNav({ newCount }: { newCount: number }) {
   const pathname = usePathname();
+  const [role, setRole] = useState<string>("Admin");
+
+  useEffect(() => {
+    const cachedRole = sessionStorage.getItem("gdg_admin_role");
+    if (cachedRole) setRole(cachedRole);
+  }, []);
+
+  const visibleItems = ITEMS.filter(({ href }) => {
+    if (role === "Reviewer") {
+      // Reviewer has only application things
+      return href === "/admin/applications";
+    }
+    if (role === "Lead") {
+      // Lead has access to analytics, overview, applications, reviews, interview plan, attendance (no broadcast, no users)
+      return href !== "/admin/broadcast" && href !== "/admin/users";
+    }
+    if (role === "Member") {
+      return false;
+    }
+    // Admin has full access
+    return true;
+  });
+
   return (
     <nav aria-label="Admin" className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-      {ITEMS.map(({ href, label, Icon, color }) => {
+      {visibleItems.map(({ href, label, Icon, color }) => {
         const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
         return (
           <Link

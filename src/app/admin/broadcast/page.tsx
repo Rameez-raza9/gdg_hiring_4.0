@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 import { APPLICATIONS, STATUS_COLOR, type Application, type Status } from "@/lib/admin-data";
 import { G } from "@/lib/brand";
 import { Card, CardHeader, PageHeader, btnGhost, btnPrimary } from "@/components/admin/ui";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 
 type Audience = "active" | Status | "custom";
 
@@ -68,14 +66,6 @@ export default function BroadcastPage() {
       setAdminEmail(cachedEmail);
       setTestEmail((prev) => prev || cachedEmail);
     }
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user?.email) {
-        setAdminEmail(user.email);
-        sessionStorage.setItem("gdg_admin_email", user.email);
-        setTestEmail((prev) => prev || user.email || "");
-      }
-    });
-    return () => unsub();
   }, []);
 
   // Load live applications from database
@@ -155,7 +145,6 @@ export default function BroadcastPage() {
     try {
       const activeAdminEmail =
         adminEmail ||
-        auth.currentUser?.email ||
         (typeof window !== "undefined" ? sessionStorage.getItem("gdg_admin_email") : "") ||
         "vinaysiddha19@gmail.com";
 

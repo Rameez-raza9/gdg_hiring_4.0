@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Calendar,
   CheckCircle2,
@@ -10,8 +11,10 @@ import {
   Filter,
   GraduationCap,
   Loader2,
+  QrCode,
   RefreshCcw,
   Search,
+  Tv,
   Users,
   XCircle,
 } from "lucide-react";
@@ -20,6 +23,9 @@ import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { PageHeader, StatCard, btnGhost, btnPrimary, Pagination } from "@/components/admin/ui";
 import { G } from "@/lib/brand";
+import { formatToIST } from "@/lib/admin-data";
+import QRScannerModal, { ScannedAttendee } from "@/components/admin/qr-scanner-modal";
+import StudentQRModal from "@/components/admin/student-qr-modal";
 
 interface AttendanceRecord {
   id: number;
@@ -82,6 +88,37 @@ export default function AttendancePage() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+
+  // QR Scanning & Student QR Modal States
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [selectedQRStudent, setSelectedQRStudent] = useState<AttendanceRecord | null>(null);
+
+  const handleAttendeeScanned = (scanned: ScannedAttendee) => {
+    setRecords((prev) => {
+      const exists = prev.some(
+        (r) => r.roll_number.trim().toUpperCase() === scanned.roll_number.trim().toUpperCase()
+      );
+      if (exists) {
+        return prev.map((r) =>
+          r.roll_number.trim().toUpperCase() === scanned.roll_number.trim().toUpperCase()
+            ? { ...r, status: "Present", marked_at: scanned.marked_at }
+            : r
+        );
+      } else {
+        const newRecord: AttendanceRecord = {
+          id: scanned.id || Date.now(),
+          event_id: selectedEventId,
+          student_name: scanned.student_name,
+          roll_number: scanned.roll_number,
+          branch: scanned.branch,
+          section: scanned.section,
+          status: "Present",
+          marked_at: scanned.marked_at,
+        };
+        return [newRecord, ...prev];
+      }
+    });
+  };
 
   // Fetch live attendance from Turso
   const loadAttendance = async (eventId: string) => {
@@ -464,7 +501,7 @@ export default function AttendancePage() {
             `"${r.roll_number}"`,
             `"${r.student_name.replace(/"/g, '""')}"`,
             `"${r.status}"`,
-            `"${r.marked_at || ""}"`,
+            `"${formatToIST(r.marked_at)}"`,
             `"${(currentEvent?.title || "").replace(/"/g, '""')}"`,
           ].join(",")
         );
@@ -494,6 +531,31 @@ export default function AttendancePage() {
         description={`${records.length} applicant records synced. Download separated rosters by Department, Branch, and Section.`}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => setIsScannerOpen(true)}
+              className={cn(
+                btnPrimary,
+                "cursor-pointer flex items-center gap-2 bg-[#4285F4] hover:bg-[#3367D6] text-white shadow-md shadow-blue-500/20"
+              )}
+              title="Open fast QR scanner with camera or barcode gun"
+            >
+              <QrCode className="size-4" />
+              <span>Scan QR Code</span>
+            </button>
+
+            <Link
+              href="/admin/attendance/tv"
+              target="_blank"
+              className={cn(
+                btnGhost,
+                "cursor-pointer flex items-center gap-2 border-emerald-500/30 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/10"
+              )}
+              title="Launch Auditorium & TV Fullscreen Display"
+            >
+              <Tv className="size-4 text-emerald-500 dark:text-emerald-400" />
+              <span>Live TV Mode</span>
+            </Link>
+
             <button
               onClick={handleSyncApplicants}
               disabled={syncing}
@@ -830,13 +892,23 @@ export default function AttendancePage() {
                         </button>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => toggleStatus(r)}
-                          className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-                        >
-                          Toggle
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQRStudent(r)}
+                            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer"
+                            title={`View & Print QR Code for ${r.student_name}`}
+                          >
+                            <QrCode className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(r)}
+                            className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                          >
+                            Toggle
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -856,6 +928,21 @@ export default function AttendancePage() {
           />
         )}
       </div>
+
+      {/* Fast & Furious QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        eventId={selectedEventId}
+        onAttendeeMarked={handleAttendeeScanned}
+      />
+
+      {/* Student QR Code Badge & Print Modal */}
+      <StudentQRModal
+        isOpen={!!selectedQRStudent}
+        onClose={() => setSelectedQRStudent(null)}
+        student={selectedQRStudent}
+      />
     </div>
   );
 }

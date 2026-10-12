@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { G } from "@/lib/brand";
 import {
-  STATUS_COLOR, avgScore, fmtDate, type Status, fetchLiveApplications, fetchLiveUsers,
+  STATUS_COLOR, avgScore, fmtDate, formatToIST, type Status, fetchLiveApplications, fetchLiveUsers, colorFor
 } from "@/lib/admin-data";
 import { Avatar, Card, CardHeader, PageHeader, ScoreDots, StatCard, TrackChip } from "@/components/admin/ui";
 import { HBars } from "@/components/admin/charts";
@@ -34,9 +34,13 @@ export default async function ReviewsPage() {
   const unanimous = apps.filter((a) => a.reviews.length >= 2 && a.reviews.every((r) => r.recommend === "Yes")).length;
 
   const workload = activeReviewers.map((u) => ({
-    label: u.name,
+    label: u.name || u.email,
     color: u.color,
-    value: allReviews.filter((r) => r.reviewer.toLowerCase() === u.name.toLowerCase()).length,
+    value: allReviews.filter((r) => {
+      const matchName = r.reviewer && r.reviewer.toLowerCase() === u.name.toLowerCase();
+      const matchEmail = r.reviewerEmail && r.reviewerEmail.toLowerCase() === u.email.toLowerCase();
+      return matchName || matchEmail;
+    }).length,
   })).sort((a, b) => b.value - a.value);
 
   const latest = [...allReviews].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
@@ -100,11 +104,16 @@ export default async function ReviewsPage() {
                         <div className="mt-3 flex items-center justify-between">
                           <ScoreDots score={avgScore(a)} size={6} />
                           <div className="flex -space-x-1.5">
-                            {a.reviews.map((r) => (
-                              <span key={r.reviewer} className="rounded-full ring-2 ring-card">
-                                <Avatar name={r.reviewer} color={r.reviewerColor} size={20} />
-                              </span>
-                            ))}
+                            {a.reviews.map((r, rIdx) => {
+                              const revName = (r.reviewer && r.reviewer !== "Vinay Siddha" && r.reviewer !== "Reviewer")
+                                ? r.reviewer
+                                : (r.reviewerEmail || "Reviewer");
+                              return (
+                                <span key={`${revName}-${rIdx}`} className="rounded-full ring-2 ring-card">
+                                  <Avatar name={revName} color={r.reviewerColor || colorFor(revName)} size={20} />
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                       </Link>
@@ -136,25 +145,30 @@ export default async function ReviewsPage() {
         <Card>
           <CardHeader title="Latest feedback" hint="Most recent reviewer notes" />
           <ul className="mt-2 divide-y divide-border">
-            {latest.map((r, i) => (
-              <li key={`${r.appId}-${r.reviewer}-${i}`} className="flex gap-4 px-6 py-4">
-                <Avatar name={r.reviewer} color={r.reviewerColor} size={34} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm">
-                      <span className="font-medium">{r.reviewer}</span>
-                      <span className="text-muted-foreground"> on </span>
-                      <Link href={`/admin/applications/${r.appId}`} className="underline-offset-4 hover:underline">
-                        {r.applicant}
-                      </Link>
-                    </p>
-                    <ScoreDots score={r.score} size={6} />
+            {latest.map((r, i) => {
+              const displayName = (r.reviewer && r.reviewer !== "Vinay Siddha" && r.reviewer !== "Reviewer")
+                ? r.reviewer
+                : (r.reviewerEmail || "Panel Reviewer");
+              return (
+                <li key={`${r.appId}-${displayName}-${i}`} className="flex gap-4 px-6 py-4">
+                  <Avatar name={displayName} color={r.reviewerColor || colorFor(displayName)} size={34} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm">
+                        <span className="font-medium">{displayName}</span>
+                        <span className="text-muted-foreground"> on </span>
+                        <Link href={`/admin/applications/${r.appId}`} className="underline-offset-4 hover:underline">
+                          {r.applicant}
+                        </Link>
+                      </p>
+                      <ScoreDots score={r.score} size={6} />
+                    </div>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{r.note}</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground/70">{r.timeIST || formatToIST(r.createdAt || r.date)}</p>
                   </div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{r.note}</p>
-                  <p className="mt-1.5 text-xs text-muted-foreground/70">{fmtDate(r.date)}</p>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </Card>
 

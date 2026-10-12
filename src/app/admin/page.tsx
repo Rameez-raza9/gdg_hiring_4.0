@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/ui";
 import { HBars, StackedBar } from "@/components/admin/charts";
 import { ApplicationToggle } from "@/components/admin/application-toggle";
+import { AdminWelcomeHeader } from "@/components/admin/admin-welcome-header";
 
 export const dynamic = "force-dynamic";
 
@@ -34,22 +35,7 @@ export default async function AdminOverview() {
 
   return (
     <>
-      <div className="mb-8 flex items-center gap-5">
-        <div className="hidden sm:block">
-          <Dot size={72} color={G.blue} shape="lean" />
-        </div>
-        <PageHeader
-          title="Welcome back, Vinay"
-          description="Here is where recruitment stands today."
-          actions={
-            <div className="flex flex-wrap items-center gap-2.5">
-              <ApplicationToggle />
-              <Link href="/admin/reviews" className={btnGhost}>Open pipeline</Link>
-              <Link href="/admin/applications" className={btnPrimary}>Review applications</Link>
-            </div>
-          }
-        />
-      </div>
+      <AdminWelcomeHeader />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total applications" value={total} note={`${thisWeek} in the last 7 days`} color={G.blue} />

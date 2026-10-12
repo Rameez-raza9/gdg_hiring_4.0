@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { turso } from "@/lib/turso";
-import { colorFor, type Application, type Review, type Status } from "@/lib/admin-data";
+import { colorFor, formatToIST, invalidateAdminCache, type Application, type Review, type Status } from "@/lib/admin-data";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET() {
   try {
     // Parallel execute indexed queries for high speed (sub-250ms)
     const [appsRes, revRes] = await Promise.all([
-      turso.execute("SELECT * FROM applications ORDER BY submitted DESC"),
+      turso.execute("SELECT * FROM applications ORDER BY submitted DESC, created_at DESC"),
       turso.execute("SELECT * FROM reviews ORDER BY created_at DESC"),
     ]);
 
@@ -16,17 +16,20 @@ export async function GET() {
     for (const r of revRes.rows) {
       const appId = String(r.application_id);
       if (!reviewsByApp[appId]) reviewsByApp[appId] = [];
+      const createdAtRaw = String(r.created_at || "2026-10-09 00:00:00");
       reviewsByApp[appId].push({
         reviewer: String(r.reviewer || "Reviewer"),
         reviewerColor: colorFor(String(r.reviewer || "R")),
         score: Math.round(Number(r.average_score || 4)),
         recommend: (String(r.decision || "Yes") as "Yes" | "Maybe" | "No"),
         note: String(r.note || ""),
-        date: String(r.created_at || "2026-10-09").slice(0, 10),
+        date: formatToIST(createdAtRaw),
+        createdAt: createdAtRaw,
+        timeIST: formatToIST(createdAtRaw),
       });
     }
 
-    const applications: Application[] = appsRes.rows.map((r) => {
+    const rawApplications: Application[] = appsRes.rows.map((r) => {
       let tracks: string[] = [];
       try {
         tracks = JSON.parse(String(r.tracks || "[]"));
@@ -53,7 +56,7 @@ export async function GET() {
         name: String(r.name),
         email: String(r.email),
         phone: String(r.phone || ""),
-        roll: String(r.roll || ""),
+        roll: String(r.roll || "").trim().toUpperCase(),
         branch: String(r.branch || "General"),
         year: Number(r.year || 1),
         tracks,
@@ -67,6 +70,38 @@ export async function GET() {
         reviews: reviewsByApp[String(r.id)] || [],
       };
     });
+
+    // Deduplicate strictly by UNIQUE roll number
+    const uniqueMap = new Map<string, Application>();
+    for (const a of rawApplications) {
+      const rollKey = a.roll ? a.roll.trim().toUpperCase() : a.id;
+      if (!uniqueMap.has(rollKey)) {
+        uniqueMap.set(rollKey, { ...a });
+      } else {
+        const existing = uniqueMap.get(rollKey)!;
+        // Promote status if one of the duplicates was moved forward
+        if (existing.status === "New" && a.status !== "New") {
+          existing.status = a.status;
+        }
+        // Merge reviews from duplicate entries so feedback is never lost
+        if (a.reviews.length > 0) {
+          const revMap = new Map<string, Review>();
+          for (const rev of [...existing.reviews, ...a.reviews]) {
+            const rk = `${rev.reviewer}-${rev.createdAt || rev.date}`;
+            if (!revMap.has(rk)) revMap.set(rk, rev);
+          }
+          existing.reviews = Array.from(revMap.values());
+        }
+        // Keep most complete fields
+        if (!existing.phone && a.phone) existing.phone = a.phone;
+        if (!existing.link && a.link) existing.link = a.link;
+        if ((!existing.extraLinks || existing.extraLinks.length === 0) && a.extraLinks?.length) {
+          existing.extraLinks = a.extraLinks;
+        }
+      }
+    }
+
+    const applications = Array.from(uniqueMap.values());
 
     return NextResponse.json(
       { applications },
@@ -240,6 +275,34 @@ export async function PATCH(req: Request) {
       args,
     });
 
+    // If panel member updater details are provided, record review/activity log in Turso
+    if (body.updaterName) {
+      try {
+        await turso.execute({
+          sql: `
+            INSERT INTO reviews (
+              application_id, reviewer, reviewer_email,
+              rating_skills, rating_motivation, rating_communication, rating_fit,
+              average_score, note, decision, created_at
+            ) VALUES (?, ?, ?, 5, 5, 5, 5, 5.0, ?, ?, datetime('now'))
+          `,
+          args: [
+            id,
+            String(body.updaterName).trim(),
+            String(body.updaterEmail || "").trim(),
+            body.updateNote
+              ? String(body.updateNote).trim()
+              : `Application details updated (${body.status ? `Status: ${body.status}` : "Profile fields updated"})`,
+            body.status ? String(body.status).trim() : "In review",
+          ],
+        });
+      } catch (logErr) {
+        console.error("Error logging updater review:", logErr);
+      }
+    }
+
+    invalidateAdminCache();
+
     return NextResponse.json({
       ok: true,
       message: "Application updated successfully",
@@ -251,30 +314,56 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE application
+// DELETE application (Supports both query parameter ?id=... and JSON body)
 export async function DELETE(req: Request) {
   try {
-    const { id } = await req.json();
+    let id: string | null = null;
+    const url = new URL(req.url);
+    id = url.searchParams.get("id");
+
+    if (!id) {
+      try {
+        const body = await req.json();
+        id = body?.id || null;
+      } catch {}
+    }
 
     if (!id) {
       return NextResponse.json({ error: "Application ID is required" }, { status: 400 });
     }
 
-    // Delete application and any associated reviews
-    await Promise.all([
-      turso.execute({
-        sql: "DELETE FROM applications WHERE id = ?",
-        args: [id],
-      }),
-      turso.execute({
-        sql: "DELETE FROM reviews WHERE application_id = ?",
-        args: [id],
-      }),
-    ]);
+    // Check application roll number to clean duplicate records for this candidate
+    const appRes = await turso.execute({
+      sql: "SELECT id, roll FROM applications WHERE id = ?",
+      args: [id],
+    });
+
+    const roll = appRes.rows[0]?.roll ? String(appRes.rows[0].roll).trim().toUpperCase() : null;
+
+    if (roll) {
+      const allMatching = await turso.execute({
+        sql: "SELECT id FROM applications WHERE UPPER(TRIM(roll)) = ?",
+        args: [roll],
+      });
+      for (const row of allMatching.rows) {
+        const rowId = String(row.id);
+        await Promise.all([
+          turso.execute({ sql: "DELETE FROM applications WHERE id = ?", args: [rowId] }),
+          turso.execute({ sql: "DELETE FROM reviews WHERE application_id = ?", args: [rowId] }),
+        ]);
+      }
+    } else {
+      await Promise.all([
+        turso.execute({ sql: "DELETE FROM applications WHERE id = ?", args: [id] }),
+        turso.execute({ sql: "DELETE FROM reviews WHERE application_id = ?", args: [id] }),
+      ]);
+    }
+
+    invalidateAdminCache();
 
     return NextResponse.json({
       ok: true,
-      message: "Application and associated reviews deleted successfully",
+      message: "Application deleted successfully",
       deletedId: id,
     });
   } catch (error) {

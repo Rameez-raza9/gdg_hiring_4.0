@@ -79,7 +79,12 @@ export default function ApplicationsPage() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setApps(parsed);
+          const map = new Map<string, Application>();
+          for (const a of parsed) {
+            const rk = a.roll ? a.roll.trim().toUpperCase() : a.id;
+            if (!map.has(rk)) map.set(rk, a);
+          }
+          setApps(Array.from(map.values()));
           setLoading(false);
         }
       }
@@ -291,8 +296,14 @@ export default function ApplicationsPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete application");
+
+      const targetApp = apps.find((a) => a.id === id);
+      const targetRoll = targetApp?.roll?.trim().toUpperCase();
+
       setApps((prev) => {
-        const next = prev.filter((a) => a.id !== id);
+        const next = prev.filter(
+          (a) => a.id !== id && (!targetRoll || a.roll?.trim().toUpperCase() !== targetRoll)
+        );
         try {
           sessionStorage.setItem(CACHE_KEY, JSON.stringify(next));
         } catch {}
@@ -577,7 +588,7 @@ export default function ApplicationsPage() {
               <tbody className="divide-y divide-border">
                 {paginatedRows.map((a) => (
                   <tr
-                    key={a.id}
+                    key={a.roll ? `${a.roll}-${a.id}` : a.id}
                     className="group transition-colors hover:bg-background/80"
                   >
                     <td className="px-6 py-3.5">

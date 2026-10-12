@@ -44,13 +44,46 @@ export type User = {
 };
 
 export type Review = {
+  id?: number;
   reviewer: string;
+  reviewerEmail?: string;
   reviewerColor: string;
   score: number; // 1-5
+  ratings?: number[];
+  decision?: string;
   recommend: "Yes" | "Maybe" | "No";
   note: string;
   date: string; // ISO
+  createdAt?: string; // Raw timestamp
+  timeIST?: string; // Indian Standard Time string
 };
+
+/** Convert any timestamp/ISO string into Indian Standard Time (IST) */
+export function formatToIST(dateInput: string | Date | undefined | null): string {
+  if (!dateInput) return "";
+  try {
+    let dateStr = String(dateInput);
+    if (!dateStr.endsWith("Z") && !dateStr.includes("+") && dateStr.includes(" ")) {
+      dateStr = dateStr.replace(" ", "T") + "Z";
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateInput);
+
+    return (
+      new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }).format(d) + " IST"
+    );
+  } catch {
+    return String(dateInput);
+  }
+}
 
 export type Application = {
   id: string;
@@ -119,17 +152,51 @@ export async function fetchLiveApplications(forceRefresh = false): Promise<Appli
     for (const r of revRes.rows) {
       const appId = String(r.application_id);
       if (!reviewsByApp[appId]) reviewsByApp[appId] = [];
+
+      const rawName = String(r.reviewer || "").trim();
+      const rawEmail = String(r.reviewer_email || "").trim();
+
+      // If reviewer name is missing, empty, or placeholder "Reviewer", or mistakenly "Vinay Siddha" for someone else:
+      // show their email address!
+      let resolvedReviewer = rawName;
+      let resolvedEmail = rawEmail;
+
+      if (!resolvedReviewer || resolvedReviewer === "Reviewer" || (resolvedReviewer === "Vinay Siddha" && resolvedEmail.toLowerCase() !== "vinaysiddha19@gmail.com")) {
+        resolvedReviewer = resolvedEmail || "Panel Reviewer";
+      }
+
+      // Avoid adding duplicate spam rows for the same applicant
+      const noteTrimmed = String(r.note || "").trim();
+      const hasDuplicate = reviewsByApp[appId].some(
+        (existing) =>
+          existing.reviewer === resolvedReviewer &&
+          existing.note.trim() === noteTrimmed
+      );
+      if (hasDuplicate) continue;
+
+      const createdAtRaw = String(r.created_at || "2026-10-09 00:00:00");
       reviewsByApp[appId].push({
-        reviewer: String(r.reviewer || "Reviewer"),
-        reviewerColor: colorFor(String(r.reviewer || "R")),
+        id: Number(r.id),
+        reviewer: resolvedReviewer,
+        reviewerEmail: resolvedEmail,
+        reviewerColor: colorFor(resolvedReviewer),
         score: Math.round(Number(r.average_score || 4)),
+        ratings: [
+          Number(r.rating_skills || 0),
+          Number(r.rating_motivation || 0),
+          Number(r.rating_communication || 0),
+          Number(r.rating_fit || 0),
+        ],
+        decision: String(r.decision || ""),
         recommend: (String(r.decision || "Yes") as "Yes" | "Maybe" | "No"),
         note: String(r.note || ""),
-        date: String(r.created_at || "2026-10-09").slice(0, 10),
+        date: formatToIST(createdAtRaw),
+        createdAt: createdAtRaw,
+        timeIST: formatToIST(createdAtRaw),
       });
     }
 
-    const apps: Application[] = res.rows.map((r) => {
+    const rawApps: Application[] = res.rows.map((r) => {
       let tracks: string[] = [];
       try {
         tracks = JSON.parse(String(r.tracks || "[]"));
@@ -156,7 +223,7 @@ export async function fetchLiveApplications(forceRefresh = false): Promise<Appli
         name: String(r.name),
         email: String(r.email),
         phone: String(r.phone || ""),
-        roll: String(r.roll || ""),
+        roll: String(r.roll || "").trim().toUpperCase(),
         branch: String(r.branch || "General"),
         year: Number(r.year || 1),
         tracks,
@@ -171,6 +238,37 @@ export async function fetchLiveApplications(forceRefresh = false): Promise<Appli
       };
     });
 
+    // Deduplicate applications strictly by UNIQUE roll number
+    const uniqueMap = new Map<string, Application>();
+    for (const a of rawApps) {
+      const rollKey = a.roll ? a.roll.trim().toUpperCase() : a.id;
+      if (!uniqueMap.has(rollKey)) {
+        uniqueMap.set(rollKey, { ...a });
+      } else {
+        const existing = uniqueMap.get(rollKey)!;
+        // If an advanced status was given to one entry, adopt it
+        if (existing.status === "New" && a.status !== "New") {
+          existing.status = a.status;
+        }
+        // Merge reviews from duplicate submissions so no panel evaluation is lost
+        if (a.reviews.length > 0) {
+          const revMap = new Map<string, Review>();
+          for (const rev of [...existing.reviews, ...a.reviews]) {
+            const rk = `${rev.reviewer}-${rev.createdAt || rev.date}`;
+            if (!revMap.has(rk)) revMap.set(rk, rev);
+          }
+          existing.reviews = Array.from(revMap.values());
+        }
+        // Retain most complete profile fields
+        if (!existing.phone && a.phone) existing.phone = a.phone;
+        if (!existing.link && a.link) existing.link = a.link;
+        if ((!existing.extraLinks || existing.extraLinks.length === 0) && a.extraLinks?.length) {
+          existing.extraLinks = a.extraLinks;
+        }
+      }
+    }
+
+    const apps = Array.from(uniqueMap.values());
     _cachedApplications = { data: apps, expiresAt: now + CACHE_TTL_MS };
     return apps;
   } catch (error) {
