@@ -7,6 +7,7 @@ import {
   Download,
   Filter,
   GraduationCap,
+  Loader2,
   Plus,
   Search,
   Users,
@@ -15,7 +16,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
-import { PageHeader, StatCard, btnGhost, btnPrimary } from "@/components/admin/ui";
+import { PageHeader, StatCard, btnGhost, btnPrimary, Pagination } from "@/components/admin/ui";
 import { G } from "@/lib/brand";
 
 interface AttendanceRecord {
@@ -78,6 +79,19 @@ export default function AttendancePage() {
   const [selectedSection, setSelectedSection] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState<"All" | "Present" | "Absent">("All");
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Busy states to prevent duplicate clicks
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedEventId, selectedBranch, selectedSection, selectedStatus, search, pageSize]);
+
   // Fetch live attendance from Turso
   useEffect(() => {
     fetch(`/api/attendance?eventId=${selectedEventId}`)
@@ -135,6 +149,8 @@ export default function AttendancePage() {
 
   // Toggle present/absent state with optimistic update and database write
   const toggleStatus = async (record: AttendanceRecord) => {
+    if (togglingId === record.id) return;
+    setTogglingId(record.id);
     const newStatus: "Present" | "Absent" = record.status === "Present" ? "Absent" : "Present";
     setRecords((prev) =>
       prev.map((r) => (r.id === record.id ? { ...r, status: newStatus } : r)),
@@ -155,16 +171,21 @@ export default function AttendancePage() {
       });
     } catch (e) {
       console.error("Failed to sync attendance:", e);
+    } finally {
+      setTogglingId(null);
     }
   };
 
   // Generate & Download PDF organized by Departments and Sections
   const exportPDF = () => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
+    if (exportingPDF) return;
+    setExportingPDF(true);
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
 
     // Brand Header
     doc.setFillColor(10, 15, 28); // #0a0f1c
@@ -242,6 +263,9 @@ export default function AttendancePage() {
 
     const safeTitle = (currentEvent?.title || "event").toLowerCase().replace(/[^a-z0-9]/g, "-");
     doc.save(`GDGoC-SVEC-Attendance-${safeTitle}-${selectedBranch}-${selectedSection}.pdf`);
+    } finally {
+      setTimeout(() => setExportingPDF(false), 700);
+    }
   };
 
   const field =
@@ -256,10 +280,23 @@ export default function AttendancePage() {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={exportPDF}
-              className={cn(btnPrimary, "cursor-pointer flex items-center gap-2")}
+              disabled={exportingPDF}
+              className={cn(
+                btnPrimary,
+                "cursor-pointer flex items-center gap-2 disabled:pointer-events-none disabled:opacity-60"
+              )}
             >
-              <Download className="size-4" />
-              Download Sorted PDF
+              {exportingPDF ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-neutral-950" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="size-4" />
+                  Download Sorted PDF
+                </>
+              )}
             </button>
           </div>
         }
@@ -388,10 +425,10 @@ export default function AttendancePage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((r, idx) => (
+                filteredRecords.slice((page - 1) * pageSize, page * pageSize).map((r, idx) => (
                   <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-5 py-4 text-xs tabular-nums text-muted-foreground">
-                      {idx + 1}
+                      {(page - 1) * pageSize + idx + 1}
                     </td>
                     <td className="px-5 py-4 font-medium text-foreground">
                       {r.student_name}
@@ -412,15 +449,21 @@ export default function AttendancePage() {
                     <td className="px-5 py-4">
                       <button
                         type="button"
+                        disabled={togglingId === r.id}
                         onClick={() => toggleStatus(r)}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition cursor-pointer",
+                          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition cursor-pointer disabled:pointer-events-none disabled:opacity-60",
                           r.status === "Present"
                             ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
                             : "bg-red-500/15 text-red-400 hover:bg-red-500/25",
                         )}
                       >
-                        {r.status === "Present" ? (
+                        {togglingId === r.id ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" />
+                            Updating...
+                          </>
+                        ) : r.status === "Present" ? (
                           <>
                             <CheckCircle2 className="size-3.5 text-green-400" />
                             Present
@@ -448,6 +491,17 @@ export default function AttendancePage() {
             </tbody>
           </table>
         </div>
+
+        {filteredRecords.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalItems={filteredRecords.length}
+            pageSize={pageSize}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(s) => setPageSize(s)}
+            pageSizeOptions={[10, 20, 50]}
+          />
+        )}
       </div>
     </>
   );
