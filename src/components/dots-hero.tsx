@@ -66,6 +66,7 @@ const DotsHero = () => {
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <Link href="/#team" className="hover:text-foreground">Team</Link>
           <Link href="/faq" className="hover:text-foreground">FAQ</Link>
+          <Link href="/interview-plan" className="hover:text-foreground">Interview Guide</Link>
           <Link href="/login" className="hover:text-foreground">Login</Link>
         </nav>
         <Link

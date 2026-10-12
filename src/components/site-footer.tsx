@@ -56,6 +56,7 @@ const EXPLORE = [
   { label: "Home", href: "/" },
   { label: "Team", href: "/#team" },
   { label: "FAQ & Answers", href: "/faq" },
+  { label: "Interview Guide", href: "/interview-plan" },
   { label: "Apply Now", href: "/apply" },
   { label: "Login Portal", href: "/login" },
 ];
