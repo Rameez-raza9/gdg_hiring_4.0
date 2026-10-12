@@ -5,10 +5,12 @@ import {
   Calendar,
   CheckCircle2,
   Download,
+  FileSpreadsheet,
+  FileText,
   Filter,
   GraduationCap,
   Loader2,
-  Plus,
+  RefreshCcw,
   Search,
   Users,
   XCircle,
@@ -38,11 +40,15 @@ interface EventItem {
   track: string;
 }
 
-const BRANCHES = ["All", "CSE", "IT", "AI & DS", "ECE", "EEE", "Mechanical", "Civil"];
-const SECTIONS = ["All", "A", "B", "C", "D"];
-
 export default function AttendancePage() {
   const [events, setEvents] = useState<EventItem[]>([
+    {
+      id: "EV-RECRUIT",
+      title: "GDGoC SVEC 4.0 Recruitment Drive & Assessment",
+      date: "2026-10-18",
+      venue: "SVEC Campus Seminar Halls & Labs",
+      track: "All Tracks",
+    },
     {
       id: "EV-101",
       title: "Google Cloud & GenAI Bootcamp",
@@ -58,21 +64,8 @@ export default function AttendancePage() {
       track: "Web and App",
     },
   ]);
-  const [selectedEventId, setSelectedEventId] = useState("EV-101");
-  const [records, setRecords] = useState<AttendanceRecord[]>([
-    { id: 1, event_id: "EV-101", student_name: "K. Sai Teja", roll_number: "22A81A0501", branch: "CSE", section: "A", status: "Present", marked_at: "2026-10-09 10:00:00" },
-    { id: 2, event_id: "EV-101", student_name: "P. Bhavya Sri", roll_number: "23A81A05B4", branch: "AI & DS", section: "A", status: "Present", marked_at: "2026-10-09 10:01:00" },
-    { id: 3, event_id: "EV-101", student_name: "V. Chaitanya Krishna", roll_number: "22A81A1208", branch: "IT", section: "B", status: "Present", marked_at: "2026-10-09 10:02:00" },
-    { id: 4, event_id: "EV-101", student_name: "M. Durga Prasad", roll_number: "24A81A0412", branch: "ECE", section: "A", status: "Absent", marked_at: "2026-10-09 10:03:00" },
-    { id: 5, event_id: "EV-101", student_name: "G. Harini", roll_number: "23A81A0589", branch: "CSE", section: "B", status: "Present", marked_at: "2026-10-09 10:04:00" },
-    { id: 6, event_id: "EV-101", student_name: "N. Rakesh", roll_number: "24A81A0215", branch: "EEE", section: "A", status: "Present", marked_at: "2026-10-09 10:05:00" },
-    { id: 7, event_id: "EV-101", student_name: "S. Sneha Latha", roll_number: "22A81A05G1", branch: "CSE", section: "C", status: "Present", marked_at: "2026-10-09 10:06:00" },
-    { id: 8, event_id: "EV-101", student_name: "D. Varun Tej", roll_number: "23A81A4210", branch: "AI & DS", section: "B", status: "Present", marked_at: "2026-10-09 10:07:00" },
-    { id: 9, event_id: "EV-101", student_name: "K. Harsha Vardhan", roll_number: "23A81A05K2", branch: "CSE", section: "C", status: "Present", marked_at: "2026-10-09 10:08:00" },
-    { id: 10, event_id: "EV-101", student_name: "B. Rajesh", roll_number: "22A81A0423", branch: "ECE", section: "B", status: "Present", marked_at: "2026-10-09 10:09:00" },
-    { id: 11, event_id: "EV-101", student_name: "T. Ananya", roll_number: "23A81A1234", branch: "IT", section: "A", status: "Present", marked_at: "2026-10-09 10:10:00" },
-    { id: 12, event_id: "EV-101", student_name: "M. Charan", roll_number: "24A81A0556", branch: "CSE", section: "A", status: "Present", marked_at: "2026-10-09 10:11:00" },
-  ]);
+  const [selectedEventId, setSelectedEventId] = useState("EV-RECRUIT");
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
   const [search, setSearch] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("All");
@@ -81,40 +74,84 @@ export default function AttendancePage() {
 
   // Pagination states
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
 
   // Busy states to prevent duplicate clicks
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
-
-  // Reset page when filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [selectedEventId, selectedBranch, selectedSection, selectedStatus, search, pageSize]);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   // Fetch live attendance from Turso
-  useEffect(() => {
-    fetch(`/api/attendance?eventId=${selectedEventId}`)
-      .then((res) => res.json())
-      .then((data) => {
+  const loadAttendance = async (eventId: string) => {
+    try {
+      const res = await fetch(`/api/attendance?eventId=${eventId}`);
+      if (res.ok) {
+        const data = await res.json();
         if (data.events?.length) setEvents(data.events);
-        if (data.attendance?.length) {
+        if (Array.isArray(data.attendance)) {
           setRecords(
             data.attendance.map((r: any) => ({
               id: r.id,
               event_id: r.event_id,
               student_name: r.student_name,
               roll_number: r.roll_number,
-              branch: r.branch,
+              branch: r.branch || "General",
               section: r.section || "A",
-              status: (r.status as "Present" | "Absent") || "Present",
+              status: (r.status as "Present" | "Absent") || "Absent",
               marked_at: r.marked_at,
-            })),
+            }))
           );
         }
-      })
-      .catch((err) => console.error("Error loading attendance:", err));
+      }
+    } catch (err) {
+      console.error("Error loading attendance:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    loadAttendance(selectedEventId);
   }, [selectedEventId]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedEventId, selectedBranch, selectedSection, selectedStatus, search, pageSize]);
+
+  // Dynamically compute available branches from actual records
+  const availableBranches = useMemo(() => {
+    const set = new Set<string>();
+    records.forEach((r) => {
+      if (r.branch) set.add(r.branch.trim());
+    });
+    return ["All", ...Array.from(set).sort()];
+  }, [records]);
+
+  // Dynamically compute available sections from actual records
+  const availableSections = useMemo(() => {
+    const set = new Set<string>();
+    records.forEach((r) => {
+      if (r.section) set.add(r.section.trim());
+    });
+    return ["All", ...Array.from(set).sort()];
+  }, [records]);
+
+  // Department counts
+  const departmentCounts = useMemo(() => {
+    const map = new Map<string, { total: number; present: number }>();
+    records.forEach((r) => {
+      const b = r.branch || "General";
+      const existing = map.get(b) || { total: 0, present: 0 };
+      existing.total++;
+      if (r.status === "Present") existing.present++;
+      map.set(b, existing);
+    });
+    return map;
+  }, [records]);
 
   // Filter and sort records based on Department and Section
   const filteredRecords = useMemo(() => {
@@ -122,13 +159,14 @@ export default function AttendancePage() {
     return records
       .filter((r) => {
         const matchesEvent = r.event_id === selectedEventId;
-        const matchesBranch = selectedBranch === "All" || r.branch === selectedBranch;
+        const matchesBranch = selectedBranch === "All" || r.branch.toLowerCase() === selectedBranch.toLowerCase();
         const matchesSection = selectedSection === "All" || r.section === selectedSection;
         const matchesStatus = selectedStatus === "All" || r.status === selectedStatus;
         const matchesSearch =
           !q ||
           r.student_name.toLowerCase().includes(q) ||
-          r.roll_number.toLowerCase().includes(q);
+          r.roll_number.toLowerCase().includes(q) ||
+          r.branch.toLowerCase().includes(q);
 
         return matchesEvent && matchesBranch && matchesSection && matchesStatus && matchesSearch;
       })
@@ -147,13 +185,37 @@ export default function AttendancePage() {
   const totalCount = records.filter((r) => r.event_id === selectedEventId).length;
   const attendanceRate = totalCount ? Math.round((presentCount / totalCount) * 100) : 0;
 
+  // Sync roster from all applications
+  const handleSyncApplicants = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "sync_from_applications",
+          eventId: selectedEventId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to sync applicants");
+      await loadAttendance(selectedEventId);
+    } catch (err) {
+      console.error("Sync error:", err);
+      alert("Failed to synchronize applicants. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Toggle present/absent state with optimistic update and database write
   const toggleStatus = async (record: AttendanceRecord) => {
     if (togglingId === record.id) return;
     setTogglingId(record.id);
     const newStatus: "Present" | "Absent" = record.status === "Present" ? "Absent" : "Present";
     setRecords((prev) =>
-      prev.map((r) => (r.id === record.id ? { ...r, status: newStatus } : r)),
+      prev.map((r) => (r.id === record.id ? { ...r, status: newStatus } : r))
     );
 
     try {
@@ -176,7 +238,35 @@ export default function AttendancePage() {
     }
   };
 
-  // Generate & Download PDF organized by Departments and Sections
+  // Batch mark all Present / Absent
+  const handleMarkAll = async (targetStatus: "Present" | "Absent") => {
+    if (
+      !window.confirm(
+        `Are you sure you want to mark all ${records.length} applicants as ${targetStatus}?`
+      )
+    ) {
+      return;
+    }
+    setRecords((prev) =>
+      prev.map((r) => (r.event_id === selectedEventId ? { ...r, status: targetStatus } : r))
+    );
+
+    try {
+      await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "mark_all",
+          eventId: selectedEventId,
+          status: targetStatus,
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to mark all:", e);
+    }
+  };
+
+  // Generate & Download PDF with clean Department and Section Separation
   const exportPDF = () => {
     if (exportingPDF) return;
     setExportingPDF(true);
@@ -187,97 +277,267 @@ export default function AttendancePage() {
         format: "a4",
       });
 
-    // Brand Header
-    doc.setFillColor(10, 15, 28); // #0a0f1c
-    doc.rect(0, 0, 210, 36, "F");
+      // Group filtered records by branch / department
+      const deptMap = new Map<string, AttendanceRecord[]>();
+      for (const r of filteredRecords) {
+        const d = r.branch || "General";
+        if (!deptMap.has(d)) deptMap.set(d, []);
+        deptMap.get(d)!.push(r);
+      }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.text("GDGoC SVEC - Official Attendance Sheet", 14, 15);
+      const departments = Array.from(deptMap.keys()).sort();
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(141, 151, 179);
-    doc.text(`Event: ${currentEvent?.title || "Community Event"} (${currentEvent?.date || "2026-10-09"})`, 14, 23);
-    doc.text(`Venue: ${currentEvent?.venue || "Auditorium"} | Sorted by: Department & Section`, 14, 29);
+      if (departments.length === 0) {
+        alert("No attendance records to export for the current filter.");
+        return;
+      }
 
-    // Filter Summary Badge
-    doc.setFontSize(9);
-    doc.setTextColor(66, 133, 244);
-    doc.text(
-      `Filter: Dept: ${selectedBranch} | Sec: ${selectedSection} | Total Attendees: ${filteredRecords.length}`,
-      14,
-      44,
-    );
-
-    // Group records by Department and Section for neat PDF tables
-    const tableData = filteredRecords.map((r, i) => [
-      String(i + 1),
-      r.student_name,
-      r.roll_number,
-      r.branch,
-      r.section,
-      r.status,
-      r.marked_at ? r.marked_at.slice(11, 16) : "-",
-    ]);
-
-    autoTable(doc, {
-      startY: 48,
-      head: [["S.No", "Student Name", "Roll Number", "Department", "Section", "Attendance", "Time"]],
-      body: tableData,
-      theme: "striped",
-      headStyles: {
-        fillColor: [36, 48, 83], // #243053
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: "bold",
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: [20, 25, 40],
-      },
-      didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 5) {
-          const val = String(data.cell.raw);
-          if (val === "Present") {
-            data.cell.styles.textColor = [52, 168, 83]; // Google Green
-            data.cell.styles.fontStyle = "bold";
-          } else {
-            data.cell.styles.textColor = [234, 67, 53]; // Google Red
-            data.cell.styles.fontStyle = "bold";
-          }
+      departments.forEach((dept, index) => {
+        if (index > 0) {
+          doc.addPage();
         }
-      },
-      margin: { left: 14, right: 14 },
-    });
 
-    // Footer with signature line
-    const finalY = (doc as any).lastAutoTable?.finalY || 200;
-    if (finalY < 260) {
-      doc.setFontSize(9);
-      doc.setTextColor(100, 110, 130);
-      doc.text("Faculty / Lead Signature: _______________________", 14, finalY + 20);
-      doc.text("Generated by GDGoC SVEC Portal", 140, finalY + 20);
-    }
+        const deptRecords = deptMap.get(dept) || [];
+        const deptPresent = deptRecords.filter((r) => r.status === "Present").length;
+        const deptAbsent = deptRecords.length - deptPresent;
+        const deptRate = deptRecords.length
+          ? Math.round((deptPresent / deptRecords.length) * 100)
+          : 0;
 
-    const safeTitle = (currentEvent?.title || "event").toLowerCase().replace(/[^a-z0-9]/g, "-");
-    doc.save(`GDGoC-SVEC-Attendance-${safeTitle}-${selectedBranch}-${selectedSection}.pdf`);
+        // Header Background Banner
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, 0, 210, 32, "F");
+
+        // Google Quad-Color Accent Strip
+        doc.setFillColor(66, 133, 244); // Blue
+        doc.rect(0, 0, 52.5, 3, "F");
+        doc.setFillColor(234, 67, 53); // Red
+        doc.rect(52.5, 0, 52.5, 3, "F");
+        doc.setFillColor(251, 188, 5); // Yellow
+        doc.rect(105, 0, 52.5, 3, "F");
+        doc.setFillColor(52, 168, 83); // Green
+        doc.rect(157.5, 0, 52.5, 3, "F");
+
+        // Header Typography
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.text("Google Developer Groups on Campus · SVEC", 14, 13);
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(203, 213, 225);
+        doc.text(`Official Attendance & Verification Roster · Event: ${currentEvent?.title}`, 14, 20);
+        doc.text(
+          `Date: ${currentEvent?.date || "2026-10-18"}  |  Venue: ${currentEvent?.venue || "SVEC Campus"}  |  Sheet: Dept. ${index + 1} of ${departments.length}`,
+          14,
+          26
+        );
+
+        // Department Section Banner
+        doc.setFillColor(241, 245, 249); // slate-100
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(14, 36, 182, 16, 2, 2, "FD");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`DEPARTMENT / BRANCH: ${dept.toUpperCase()}`, 18, 43);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(
+          `Total Candidates: ${deptRecords.length}   |   Present: ${deptPresent}   |   Absent: ${deptAbsent}   |   Turnout Rate: ${deptRate}%`,
+          18,
+          49
+        );
+
+        // Build Table Data for this Department
+        const tableData = deptRecords.map((r, i) => [
+          String(i + 1),
+          r.roll_number,
+          r.student_name,
+          r.section,
+          r.status,
+          r.marked_at ? r.marked_at.slice(11, 16) : "-",
+          "", // Blank column for offline/evaluator signature
+        ]);
+
+        autoTable(doc, {
+          startY: 56,
+          head: [
+            ["#", "Roll Number", "Student Name", "Sec", "Attendance", "Marked Time", "Signature / Remarks"],
+          ],
+          body: tableData,
+          theme: "grid",
+          headStyles: {
+            fillColor: [30, 41, 59], // slate-800
+            textColor: [255, 255, 255],
+            fontSize: 8.5,
+            fontStyle: "bold",
+          },
+          bodyStyles: {
+            fontSize: 8.5,
+            textColor: [15, 23, 42],
+            cellPadding: 2.2,
+          },
+          columnStyles: {
+            0: { cellWidth: 10, halign: "center" },
+            1: { cellWidth: 32, fontStyle: "bold" },
+            2: { cellWidth: 50 },
+            3: { cellWidth: 14, halign: "center" },
+            4: { cellWidth: 24, halign: "center" },
+            5: { cellWidth: 18, halign: "center" },
+            6: { cellWidth: 34 },
+          },
+          didParseCell: (data) => {
+            if (data.section === "body" && data.column.index === 4) {
+              const val = String(data.cell.raw);
+              if (val === "Present") {
+                data.cell.styles.textColor = [52, 168, 83]; // Google Green
+                data.cell.styles.fontStyle = "bold";
+              } else {
+                data.cell.styles.textColor = [234, 67, 53]; // Google Red
+                data.cell.styles.fontStyle = "bold";
+              }
+            }
+          },
+          margin: { left: 14, right: 14, bottom: 24 },
+        });
+
+        // Department Footer Signatures
+        const finalY = (doc as any).lastAutoTable?.finalY || 240;
+        if (finalY < 265) {
+          doc.setFontSize(8);
+          doc.setTextColor(100, 116, 139);
+          doc.text("Faculty / Department Incharge Signature: _______________________", 14, finalY + 14);
+          doc.text("GDG Lead Signature: _______________________", 130, finalY + 14);
+          doc.text(
+            `GDGoC SVEC Portal Verified · Generated: ${new Date().toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}`,
+            14,
+            finalY + 20
+          );
+        }
+      });
+
+      const safeTitle = (currentEvent?.title || "event").toLowerCase().replace(/[^a-z0-9]/g, "-");
+      doc.save(
+        `GDGoC-SVEC-Attendance-${safeTitle}-${selectedBranch === "All" ? "All-Departments" : selectedBranch}.pdf`
+      );
     } finally {
-      setTimeout(() => setExportingPDF(false), 700);
+      setTimeout(() => setExportingPDF(false), 800);
+    }
+  };
+
+  // Generate & Download Department and Section Separated CSV
+  const exportCSV = () => {
+    if (exportingCSV) return;
+    setExportingCSV(true);
+    try {
+      const headers = [
+        "Department",
+        "Section",
+        "Roll Number",
+        "Student Name",
+        "Attendance Status",
+        "Marked Time",
+        "Event Title",
+      ];
+      const csvRows = [headers.join(",")];
+
+      const sorted = [...filteredRecords].sort((a, b) => {
+        if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+        if (a.section !== b.section) return a.section.localeCompare(b.section);
+        return a.roll_number.localeCompare(b.roll_number);
+      });
+
+      for (const r of sorted) {
+        csvRows.push(
+          [
+            `"${r.branch}"`,
+            `"${r.section}"`,
+            `"${r.roll_number}"`,
+            `"${r.student_name.replace(/"/g, '""')}"`,
+            `"${r.status}"`,
+            `"${r.marked_at || ""}"`,
+            `"${(currentEvent?.title || "").replace(/"/g, '""')}"`,
+          ].join(",")
+        );
+      }
+
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `GDGoC-SVEC-Attendance-${(currentEvent?.id || "drive").toLowerCase()}-${selectedBranch.toLowerCase()}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setTimeout(() => setExportingCSV(false), 500);
     }
   };
 
   const field =
-    "rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-foreground/40 text-foreground";
+    "rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-foreground/40 text-foreground cursor-pointer";
 
   return (
-    <>
+    <div className="smooth-fade-in">
       <PageHeader
-        title="Event Attendance"
-        description="Mark real-time student check-ins and download department & section sorted PDF rosters."
+        title="Event & Recruitment Attendance"
+        description={`${records.length} applicant records synced. Download separated rosters by Department, Branch, and Section.`}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleSyncApplicants}
+              disabled={syncing}
+              className={cn(
+                btnGhost,
+                "cursor-pointer flex items-center gap-2 disabled:opacity-60"
+              )}
+              title="Resynchronize roster from the 300+ applications table"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span>Syncing Roster...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCcw className="size-4" />
+                  <span>Sync Applicants</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={exportCSV}
+              disabled={exportingCSV}
+              className={cn(
+                btnGhost,
+                "cursor-pointer flex items-center gap-2 disabled:opacity-60"
+              )}
+              title="Export formatted CSV separated by department and section"
+            >
+              {exportingCSV ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  <span>Exporting CSV...</span>
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="size-4" />
+                  <span>Export CSV</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={exportPDF}
               disabled={exportingPDF}
@@ -285,16 +545,17 @@ export default function AttendancePage() {
                 btnPrimary,
                 "cursor-pointer flex items-center gap-2 disabled:pointer-events-none disabled:opacity-60"
               )}
+              title="Download Department-Separated Official Attendance PDF"
             >
               {exportingPDF ? (
                 <>
                   <Loader2 className="size-4 animate-spin text-neutral-950" />
-                  Generating PDF...
+                  <span>Generating PDF...</span>
                 </>
               ) : (
                 <>
                   <Download className="size-4" />
-                  Download Sorted PDF
+                  <span>Download Department PDF</span>
                 </>
               )}
             </button>
@@ -304,10 +565,84 @@ export default function AttendancePage() {
 
       {/* Metrics Row */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
-        <StatCard label="Total Registered" value={totalCount} note="Enrolled for this session" color={G.blue} />
-        <StatCard label="Present Today" value={presentCount} note="Marked at attendance desk" color={G.green} />
-        <StatCard label="Absent" value={totalCount - presentCount} note="Not checked in" color={G.red} />
-        <StatCard label="Attendance Rate" value={`${attendanceRate}%`} note="Turnout percentage" color={G.yellow} />
+        <StatCard
+          label="Total Registered"
+          value={totalCount}
+          note="Enrolled for this drive / event"
+          color={G.blue}
+        />
+        <StatCard
+          label="Present Candidates"
+          value={presentCount}
+          note="Verified check-ins"
+          color={G.green}
+        />
+        <StatCard
+          label="Absent Candidates"
+          value={totalCount - presentCount}
+          note="Pending or no-shows"
+          color={G.red}
+        />
+        <StatCard
+          label="Turnout Rate"
+          value={`${attendanceRate}%`}
+          note="Overall percentage"
+          color={G.yellow}
+        />
+      </div>
+
+      {/* Quick Action & Department Badges */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Filter Department:
+          </span>
+          {availableBranches.map((b) => {
+            const active = selectedBranch === b;
+            const stats = b === "All" ? { total: records.length } : departmentCounts.get(b);
+            const count = stats?.total ?? 0;
+            return (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setSelectedBranch(b)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition cursor-pointer",
+                  active
+                    ? "border-foreground bg-foreground text-background shadow-xs"
+                    : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                )}
+              >
+                <span>{b}</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.2 text-[10px] tabular-nums font-semibold",
+                    active ? "bg-background/20 text-background" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleMarkAll("Present")}
+            className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/20 cursor-pointer"
+          >
+            Mark All Present
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMarkAll("Absent")}
+            className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:bg-rose-500/20 cursor-pointer"
+          >
+            Mark All Absent
+          </button>
+        </div>
       </div>
 
       {/* Event Selector & Filters */}
@@ -315,11 +650,11 @@ export default function AttendancePage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Calendar className="size-5 text-primary" />
-            <span className="text-sm font-medium">Select Session:</span>
+            <span className="text-sm font-medium">Drive / Session:</span>
             <select
               value={selectedEventId}
               onChange={(e) => setSelectedEventId(e.target.value)}
-              className={cn(field, "font-medium")}
+              className={cn(field, "font-medium min-w-[280px]")}
             >
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
@@ -330,9 +665,13 @@ export default function AttendancePage() {
           </div>
 
           <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <span>Venue: <strong className="text-foreground">{currentEvent?.venue}</strong></span>
+            <span>
+              Venue: <strong className="text-foreground">{currentEvent?.venue}</strong>
+            </span>
             <span>•</span>
-            <span>Track: <strong className="text-foreground">{currentEvent?.track}</strong></span>
+            <span>
+              Track: <strong className="text-foreground">{currentEvent?.track}</strong>
+            </span>
           </div>
         </div>
 
@@ -355,12 +694,14 @@ export default function AttendancePage() {
               onChange={(e) => setSelectedBranch(e.target.value)}
               className={cn(field, "w-full")}
             >
-              <option value="All">All Departments</option>
-              {BRANCHES.filter((b) => b !== "All").map((b) => (
-                <option key={b} value={b}>
-                  Dept: {b}
-                </option>
-              ))}
+              <option value="All">All Departments ({records.length})</option>
+              {availableBranches
+                .filter((b) => b !== "All")
+                .map((b) => (
+                  <option key={b} value={b}>
+                    Dept: {b} ({departmentCounts.get(b)?.total ?? 0})
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -371,11 +712,13 @@ export default function AttendancePage() {
               className={cn(field, "w-full")}
             >
               <option value="All">All Sections</option>
-              {SECTIONS.filter((s) => s !== "All").map((s) => (
-                <option key={s} value={s}>
-                  Section {s}
-                </option>
-              ))}
+              {availableSections
+                .filter((s) => s !== "All")
+                .map((s) => (
+                  <option key={s} value={s}>
+                    Section {s}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -385,9 +728,9 @@ export default function AttendancePage() {
               onChange={(e) => setSelectedStatus(e.target.value as any)}
               className={cn(field, "w-full")}
             >
-              <option value="All">All Statuses</option>
-              <option value="Present">Present Only</option>
-              <option value="Absent">Absent Only</option>
+              <option value="All">All Statuses ({filteredRecords.length})</option>
+              <option value="Present">Present Only ({presentCount})</option>
+              <option value="Absent">Absent Only ({totalCount - presentCount})</option>
             </select>
           </div>
         </div>
@@ -397,20 +740,21 @@ export default function AttendancePage() {
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="p-4 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Showing <strong className="text-foreground">{filteredRecords.length}</strong> students sorted by Department & Section
+            Showing <strong className="text-foreground">{filteredRecords.length}</strong> applicants
+            organized by Department & Section
           </span>
           <span className="hidden sm:inline">
-            Click status pill to toggle Present / Absent
+            Click status button to toggle Present / Absent in real time
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-sm min-w-[760px]">
             <thead className="border-b border-border bg-background/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-5 py-3.5">#</th>
-                <th className="px-5 py-3.5">Student Name</th>
                 <th className="px-5 py-3.5">Roll Number</th>
+                <th className="px-5 py-3.5">Student Name</th>
                 <th className="px-5 py-3.5">Department</th>
                 <th className="px-5 py-3.5">Section</th>
                 <th className="px-5 py-3.5">Status</th>
@@ -418,91 +762,100 @@ export default function AttendancePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredRecords.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    No students match the selected department, section, or search criteria.
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <Loader2 className="mx-auto size-6 animate-spin mb-2 text-primary" />
+                    Loading synchronized attendance records...
+                  </td>
+                </tr>
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    No candidates match the selected department, section, or search criteria.
                   </td>
                 </tr>
               ) : (
-                filteredRecords.slice((page - 1) * pageSize, page * pageSize).map((r, idx) => (
-                  <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-4 text-xs tabular-nums text-muted-foreground">
-                      {(page - 1) * pageSize + idx + 1}
-                    </td>
-                    <td className="px-5 py-4 font-medium text-foreground">
-                      {r.student_name}
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs text-muted-foreground">
-                      {r.roll_number}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                        {r.branch}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                        Sec {r.section}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <button
-                        type="button"
-                        disabled={togglingId === r.id}
-                        onClick={() => toggleStatus(r)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition cursor-pointer disabled:pointer-events-none disabled:opacity-60",
-                          r.status === "Present"
-                            ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
-                            : "bg-red-500/15 text-red-400 hover:bg-red-500/25",
-                        )}
-                      >
-                        {togglingId === r.id ? (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin" />
-                            Updating...
-                          </>
-                        ) : r.status === "Present" ? (
-                          <>
-                            <CheckCircle2 className="size-3.5 text-green-400" />
-                            Present
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="size-3.5 text-red-400" />
-                            Absent
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(r)}
-                        className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-                      >
-                        Switch
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredRecords
+                  .slice((page - 1) * pageSize, page * pageSize)
+                  .map((r, idx) => (
+                    <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-4 text-xs tabular-nums text-muted-foreground">
+                        {(page - 1) * pageSize + idx + 1}
+                      </td>
+                      <td className="px-5 py-4 font-mono text-xs font-medium text-foreground">
+                        {r.roll_number}
+                      </td>
+                      <td className="px-5 py-4 font-medium text-foreground">
+                        {r.student_name}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+                          {r.branch}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                          Sec {r.section}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          disabled={togglingId === r.id}
+                          onClick={() => toggleStatus(r)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition cursor-pointer disabled:pointer-events-none disabled:opacity-60",
+                            r.status === "Present"
+                              ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                              : "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25"
+                          )}
+                        >
+                          {togglingId === r.id ? (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin" />
+                              Saving...
+                            </>
+                          ) : r.status === "Present" ? (
+                            <>
+                              <CheckCircle2 className="size-3.5 text-emerald-400" />
+                              Present
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="size-3.5 text-rose-400" />
+                              Absent
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(r)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        >
+                          Toggle
+                        </button>
+                      </td>
+                    </tr>
+                  ))
               )}
             </tbody>
           </table>
         </div>
 
-        {filteredRecords.length > 0 && (
+        {!loading && filteredRecords.length > 0 && (
           <Pagination
             currentPage={page}
             totalItems={filteredRecords.length}
             pageSize={pageSize}
             onPageChange={(p) => setPage(p)}
             onPageSizeChange={(s) => setPageSize(s)}
-            pageSizeOptions={[10, 20, 50]}
+            pageSizeOptions={[15, 30, 60, 100]}
           />
         )}
       </div>
-    </>
+    </div>
   );
 }

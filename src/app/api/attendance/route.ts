@@ -1,13 +1,38 @@
 import { NextResponse } from "next/server";
 import { turso } from "@/lib/turso";
 
+function deriveSectionFromRoll(roll: string): string {
+  const clean = roll.trim().toUpperCase();
+  if (clean.length < 10) return "A";
+  const last2 = clean.slice(-2);
+  const lastChar = last2[0];
+  const num = parseInt(last2, 10);
+  if (!isNaN(num)) {
+    if (num <= 65) return "A";
+    return "B";
+  }
+  if (["A", "B", "C"].includes(lastChar)) return "B";
+  if (["D", "E", "F", "G", "H"].includes(lastChar)) return "C";
+  if (["J", "K", "L", "M", "N", "P", "Q", "R"].includes(lastChar)) return "D";
+  return "A";
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const eventId = searchParams.get("eventId") || "EV-101";
+  const eventId = searchParams.get("eventId") || "EV-RECRUIT";
 
   try {
-    const eventsRes = await turso.execute("SELECT * FROM events ORDER BY date DESC");
-    const attRes = await turso.execute({
+    // Ensure Recruitment Drive event exists in events table
+    await turso.execute({
+      sql: `
+        INSERT OR IGNORE INTO events (id, title, date, venue, track)
+        VALUES ('EV-RECRUIT', 'GDGoC SVEC 4.0 Recruitment Drive & Assessment', '2026-10-18', 'SVEC Campus Seminar Halls & Labs', 'All Tracks')
+      `,
+    });
+
+    const eventsRes = await turso.execute("SELECT * FROM events ORDER BY (id = 'EV-RECRUIT') DESC, date DESC");
+
+    let attRes = await turso.execute({
       sql: `
         SELECT * FROM attendance
         WHERE event_id = ?
@@ -15,6 +40,43 @@ export async function GET(req: Request) {
       `,
       args: [eventId],
     });
+
+    // If attendance table is empty for this event, auto-populate from the 300+ applications
+    if (attRes.rows.length === 0) {
+      const appsRes = await turso.execute(
+        "SELECT id, name, roll, branch, status FROM applications ORDER BY branch ASC, roll ASC"
+      );
+
+      if (appsRes.rows.length > 0) {
+        for (const app of appsRes.rows) {
+          const roll = String(app.roll || app.id).trim().toUpperCase();
+          const name = String(app.name || "Applicant").trim();
+          const branch = String(app.branch || "General").trim();
+          const section = deriveSectionFromRoll(roll);
+          const initialStatus =
+            app.status === "Accepted" || app.status === "Interview" ? "Present" : "Absent";
+
+          await turso.execute({
+            sql: `
+              INSERT OR IGNORE INTO attendance (
+                event_id, application_id, student_name, roll_number, branch, section, status, marked_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            `,
+            args: [eventId, String(app.id), name, roll, branch, section, initialStatus],
+          });
+        }
+
+        // Re-query newly synced attendance records
+        attRes = await turso.execute({
+          sql: `
+            SELECT * FROM attendance
+            WHERE event_id = ?
+            ORDER BY branch ASC, section ASC, roll_number ASC
+          `,
+          args: [eventId],
+        });
+      }
+    }
 
     return NextResponse.json({
       events: eventsRes.rows,
@@ -32,11 +94,77 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const data = await req.json();
-    const { eventId = "EV-101", studentName, rollNumber, branch, section = "A", status = "Present" } = data;
+    const {
+      eventId = "EV-RECRUIT",
+      action,
+      studentName,
+      rollNumber,
+      branch,
+      section = "A",
+      status = "Present",
+    } = data;
 
+    // ACTION: Explicit sync from applications table
+    if (action === "sync_from_applications") {
+      const appsRes = await turso.execute(
+        "SELECT id, name, roll, branch, status FROM applications ORDER BY branch ASC, roll ASC"
+      );
+
+      const batchStatements = appsRes.rows.map((app: any) => {
+        const roll = String(app.roll || app.id).trim().toUpperCase();
+        const name = String(app.name || "Applicant").trim();
+        const appBranch = String(app.branch || "General").trim();
+        const appSection = deriveSectionFromRoll(roll);
+        const appStatus =
+          app.status === "Accepted" || app.status === "Interview" ? "Present" : "Absent";
+
+        return {
+          sql: `
+            INSERT INTO attendance (
+              event_id, application_id, student_name, roll_number, branch, section, status, marked_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(event_id, roll_number) DO UPDATE SET
+              student_name = excluded.student_name,
+              branch = excluded.branch,
+              section = excluded.section
+          `,
+          args: [eventId, String(app.id), name, roll, appBranch, appSection, appStatus],
+        };
+      });
+
+      if (batchStatements.length > 0) {
+        await turso.batch(batchStatements, "write");
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: `Successfully synchronized ${batchStatements.length} applicants into attendance roster.`,
+        syncedCount: batchStatements.length,
+      });
+    }
+
+    // ACTION: Batch mark all Present / Absent
+    if (action === "mark_all") {
+      const targetStatus = status === "Present" ? "Present" : "Absent";
+      await turso.execute({
+        sql: `
+          UPDATE attendance
+          SET status = ?, marked_at = datetime('now')
+          WHERE event_id = ?
+        `,
+        args: [targetStatus, eventId],
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: `All attendees set to ${targetStatus}`,
+      });
+    }
+
+    // ACTION: Single attendee toggle / insert
     if (!studentName || !rollNumber || !branch) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields (studentName, rollNumber, branch)" },
         { status: 400 },
       );
     }
@@ -49,7 +177,7 @@ export async function POST(req: Request) {
           status = excluded.status,
           marked_at = datetime('now')
       `,
-      args: [eventId, studentName, rollNumber, branch, section, status],
+      args: [eventId, studentName, rollNumber.trim().toUpperCase(), branch, section, status],
     });
 
     return NextResponse.json({

@@ -7,9 +7,12 @@ import {
   Download,
   Filter,
   Loader2,
+  Pencil,
+  Plus,
   RotateCcw,
   Search,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +38,7 @@ import {
   btnGhost,
 } from "@/components/admin/ui";
 import { ApplicationToggle } from "@/components/admin/application-toggle";
+import { ApplicationFormModal } from "@/components/admin/application-form-modal";
 
 type SortOption = "newest" | "oldest" | "score-desc" | "score-asc" | "name-asc";
 
@@ -43,6 +47,11 @@ const CACHE_KEY = "gdg_cached_applications";
 export default function ApplicationsPage() {
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Modal & CRUD states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingApp, setEditingApp] = useState<Application | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Filter States
   const [q, setQ] = useState("");
@@ -253,6 +262,50 @@ export default function ApplicationsPage() {
     }
   };
 
+  const handleSave = (savedApp: Application) => {
+    setApps((prev) => {
+      const exists = prev.some((a) => a.id === savedApp.id);
+      const next = exists
+        ? prev.map((a) => (a.id === savedApp.id ? savedApp : a))
+        : [savedApp, ...prev];
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setModalOpen(false);
+    setEditingApp(null);
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete application for "${name}"?\nThis will also remove any reviews for this applicant.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete application");
+      setApps((prev) => {
+        const next = prev.filter((a) => a.id !== id);
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete application. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const selectCls =
     "rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-foreground outline-none transition focus:border-foreground/40 hover:border-foreground/20 cursor-pointer";
 
@@ -264,6 +317,16 @@ export default function ApplicationsPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <ApplicationToggle />
+            <button
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#4285F4] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#3367D6] cursor-pointer"
+              onClick={() => {
+                setEditingApp(null);
+                setModalOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              <span>Add Applicant</span>
+            </button>
             <button
               className={btnGhost}
               onClick={() => exportCSV(hasActiveFilters)}
@@ -495,7 +558,7 @@ export default function ApplicationsPage() {
 
         {/* Table Content */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[840px] text-left text-sm">
+          <table className="w-full min-w-[880px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-6 py-3.5">Applicant</th>
@@ -504,9 +567,7 @@ export default function ApplicationsPage() {
                 <th className="px-3 py-3.5">Score</th>
                 <th className="px-3 py-3.5">Status</th>
                 <th className="px-3 py-3.5">Applied</th>
-                <th className="w-10 px-3 py-3.5">
-                  <span className="sr-only">Open</span>
-                </th>
+                <th className="w-28 px-3 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -555,14 +616,43 @@ export default function ApplicationsPage() {
                     <td className="px-3 py-3.5 text-xs text-muted-foreground">
                       {fmtDate(a.submitted)}
                     </td>
-                    <td className="px-3 py-3.5">
-                      <Link
-                        href={`/admin/applications/${a.id}`}
-                        aria-label={`Open applicant details for ${a.name}`}
-                        className="grid size-7 place-items-center rounded-lg border border-transparent text-muted-foreground transition group-hover:border-border group-hover:bg-card group-hover:text-foreground"
-                      >
-                        <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                      </Link>
+                    <td className="px-3 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingApp(a);
+                            setModalOpen(true);
+                          }}
+                          aria-label={`Edit ${a.name}`}
+                          title="Edit application"
+                          className="grid size-7 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-card hover:text-[#4285F4] cursor-pointer"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(a.id, a.name)}
+                          disabled={deletingId === a.id}
+                          aria-label={`Delete ${a.name}`}
+                          title="Delete application"
+                          className="grid size-7 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive cursor-pointer disabled:opacity-50"
+                        >
+                          {deletingId === a.id ? (
+                            <Loader2 className="size-3.5 animate-spin text-destructive" />
+                          ) : (
+                            <Trash2 className="size-3.5" />
+                          )}
+                        </button>
+                        <Link
+                          href={`/admin/applications/${a.id}`}
+                          aria-label={`Open applicant details for ${a.name}`}
+                          title="View application details"
+                          className="grid size-7 place-items-center rounded-lg border border-transparent text-muted-foreground transition group-hover:border-border group-hover:bg-card group-hover:text-foreground"
+                        >
+                          <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -609,6 +699,17 @@ export default function ApplicationsPage() {
           />
         )}
       </Card>
+
+      {/* Application Form Modal (Create & Edit) */}
+      <ApplicationFormModal
+        isOpen={modalOpen}
+        initialData={editingApp}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingApp(null);
+        }}
+        onSaved={handleSave}
+      />
     </div>
   );
 }

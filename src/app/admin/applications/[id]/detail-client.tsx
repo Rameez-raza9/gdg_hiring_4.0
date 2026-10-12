@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Mail, Phone } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ExternalLink, Loader2, Mail, Pencil, Phone, Trash2 } from "lucide-react";
 import { type Application, type Review, type Status, avgScore, fmtDate } from "@/lib/admin-data";
 import { Avatar, Card, CardHeader, ScoreDots, StatusBadge, TrackChip } from "@/components/admin/ui";
 import ReviewPanel from "./review-panel";
+import { ApplicationFormModal } from "@/components/admin/application-form-modal";
 
 export default function ApplicationDetailClient({
   initialApplication,
 }: {
   initialApplication: Application;
 }) {
+  const router = useRouter();
   const [app, setApp] = useState<Application>(initialApplication);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleReviewAdded = (newReview: Review, newStatus?: Status) => {
     setApp((prev) => {
@@ -25,6 +30,62 @@ export default function ApplicationDetailClient({
         reviews: updatedReviews,
       };
     });
+  };
+
+  const handleSaved = (updated: Application) => {
+    setApp((prev) => ({
+      ...prev,
+      ...updated,
+    }));
+    try {
+      const cached = sessionStorage.getItem("gdg_cached_applications");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          const idx = parsed.findIndex((a: Application) => a.id === updated.id);
+          if (idx !== -1) {
+            parsed[idx] = { ...parsed[idx], ...updated };
+            sessionStorage.setItem("gdg_cached_applications", JSON.stringify(parsed));
+          }
+        }
+      }
+    } catch {}
+    setIsEditOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete application for "${app.name}"?\nThis will remove the applicant and all team reviews.`
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/applications?id=${encodeURIComponent(app.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete application");
+
+      try {
+        const cached = sessionStorage.getItem("gdg_cached_applications");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const next = parsed.filter((a: Application) => a.id !== app.id);
+            sessionStorage.setItem("gdg_cached_applications", JSON.stringify(next));
+          }
+        }
+      } catch {}
+
+      router.push("/admin/applications");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete application. Please try again.");
+      setIsDeleting(false);
+    }
   };
 
   const score = avgScore(app);
@@ -42,12 +103,37 @@ export default function ApplicationDetailClient({
 
   return (
     <>
-      <Link
-        href="/admin/applications"
-        className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> All applications
-      </Link>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/admin/applications"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> All applications
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-medium text-foreground transition hover:border-[#4285F4] hover:text-[#4285F4] hover:bg-muted cursor-pointer"
+          >
+            <Pencil className="size-3.5" />
+            Edit Application
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2 text-xs font-medium text-destructive transition hover:bg-destructive/20 cursor-pointer disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="size-3.5" />
+            )}
+            Delete
+          </button>
+        </div>
+      </div>
 
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center gap-5">
@@ -205,6 +291,13 @@ export default function ApplicationDetailClient({
           </Card>
         </div>
       </div>
+
+      <ApplicationFormModal
+        isOpen={isEditOpen}
+        initialData={app}
+        onClose={() => setIsEditOpen(false)}
+        onSaved={handleSaved}
+      />
     </>
   );
 }
