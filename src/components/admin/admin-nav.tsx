@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CheckSquare, ClipboardCheck, Inbox, LayoutDashboard, Megaphone, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, CheckSquare, ClipboardCheck, Inbox, LayoutDashboard, Megaphone, Users, Sparkles, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { G } from "@/lib/brand";
 
@@ -10,6 +10,7 @@ const ITEMS: { href: string; label: string; Icon: LucideIcon; color: string }[] 
   { href: "/admin", label: "Overview", Icon: LayoutDashboard, color: G.blue },
   { href: "/admin/applications", label: "Applications", Icon: Inbox, color: G.red },
   { href: "/admin/reviews", label: "Reviews", Icon: ClipboardCheck, color: G.yellow },
+  { href: "/admin/interview-plan", label: "Interview Plan", Icon: Sparkles, color: G.blue },
   { href: "/admin/broadcast", label: "Broadcast", Icon: Megaphone, color: G.red },
   { href: "/admin/attendance", label: "Attendance", Icon: CheckSquare, color: G.green },
   { href: "/admin/analytics", label: "Analytics", Icon: BarChart3, color: G.blue },
