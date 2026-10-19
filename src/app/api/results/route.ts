@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // 3. Only this person's own result is returned (never the email/roll back, never anyone else).
-  const { name, outcome, team, role, no } = entry;
-  return NextResponse.json({ name, outcome, team, role, no }, { headers: { "Cache-Control": "no-store" } });
+  // 3. Only this person's own result is returned.
+  const { name, outcome } = entry;
+  return NextResponse.json({ name, outcome }, { headers: { "Cache-Control": "no-store" } });
 }

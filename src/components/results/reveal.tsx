@@ -5,14 +5,10 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { G } from "@/lib/brand";
 import { Dot } from "@/components/dot";
-import { TEAMS, type Outcome, type TeamName } from "@/lib/teams";
 
 export type Revealed = {
-  name: string;
-  outcome: Outcome;
-  team?: TeamName;
-  role?: string;
-  no?: number;
+  name?: string;
+  outcome: "Accepted" | "Not selected" | "Waitlist";
 };
 
 const BEATS = [
@@ -45,7 +41,7 @@ function Confetti() {
 
 export default function Reveal({ result }: { result: Revealed }) {
   const reduce = useReducedMotion();
-  const [step, setStep] = useState(reduce ? BEATS.length : 0); // 0..3 beats, 4 = result
+  const [step, setStep] = useState(reduce ? BEATS.length : 0);
 
   useEffect(() => {
     if (step >= BEATS.length) return;
@@ -55,8 +51,7 @@ export default function Reveal({ result }: { result: Revealed }) {
 
   const done = step >= BEATS.length;
   const accepted = result.outcome === "Accepted";
-  const team = result.team ? TEAMS[result.team] : null;
-  const accent = accepted && team ? team.color : G.blue;
+  const accent = accepted ? G.green : G.blue;
 
   return (
     <div className="mx-auto w-full max-w-xl text-center">
@@ -108,31 +103,19 @@ export default function Reveal({ result }: { result: Revealed }) {
               style={accepted ? { boxShadow: `0 0 0 1px ${accent}55, 0 30px 80px ${accent}22` } : undefined}
             >
               <div className="flex justify-center">
-                <Dot size={132} color={accent} shape={team?.shape ?? "round"} still={!accepted} />
+                <Dot size={132} color={accent} shape={accepted ? "squircle" : "round"} still={!accepted} />
               </div>
 
-              {accepted && team ? (
+              {accepted ? (
                 <>
-                  <p className="mt-6 text-sm text-muted-foreground">Welcome to GDG 4.0</p>
+                  <p className="mt-6 text-sm text-muted-foreground">GDG on Campus SVEC — Batch 4.0</p>
                   <h1 className="mt-2 text-balance text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
-                    Congratulations{result.name ? `, ${firstName(result.name)}` : ""}
+                    Congratulations{result.name ? `, ${firstName(result.name)}` : ""}! 🎉
                   </h1>
-                  <div className="mt-8 rounded-2xl border border-border bg-background p-6 text-left">
-                    <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                      <span className="size-2.5 rounded-full" style={{ background: accent }} aria-hidden="true" />
-                      Your team
-                    </p>
-                    <p className="mt-2 text-3xl font-medium tracking-tight" style={{ color: accent }}>
-                      {result.team}
-                    </p>
-                    {result.role && <p className="mt-1 text-lg">{result.role}</p>}
-                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{team.line}</p>
-                    {result.no && (
-                      <p className="mt-5 border-t border-dashed border-border pt-4 text-xs text-muted-foreground">
-                        Member #{String(result.no).padStart(3, "0")} of GDG 4.0
-                      </p>
-                    )}
-                  </div>
+                  <p className="mx-auto mt-5 max-w-md leading-relaxed text-muted-foreground">
+                    You have been selected for GDG on Campus SVEC 4.0. Welcome to the team!
+                    Join the WhatsApp group for further details about the onboarding and first meet.
+                  </p>
                   <a
                     href={WHATSAPP}
                     target="_blank"
@@ -144,24 +127,6 @@ export default function Reveal({ result }: { result: Revealed }) {
                   <p className="mt-4 text-xs text-muted-foreground">
                     Venue and timings for the first meet will be shared on WhatsApp and by email.
                   </p>
-                </>
-              ) : result.outcome === "Waitlist" ? (
-                <>
-                  <h1 className="mt-6 text-balance text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
-                    You are on the reserve bench{result.name ? `, ${firstName(result.name)}` : ""}
-                  </h1>
-                  <p className="mx-auto mt-5 max-w-md leading-relaxed text-muted-foreground">
-                    You made a strong impression. We have no open slot right now, but if one opens
-                    we will contact you by email and WhatsApp. Keep an eye on both.
-                  </p>
-                  <a
-                    href={WHATSAPP}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-8 inline-block rounded-xl border border-border bg-background px-7 py-3.5 text-sm font-medium transition hover:border-foreground/30"
-                  >
-                    Join the WhatsApp updates group
-                  </a>
                 </>
               ) : (
                 <>
