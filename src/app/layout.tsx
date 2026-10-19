@@ -37,8 +37,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${googleSans.variable} font-sans`}>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-blue-100 selection:text-blue-900">
+    <html lang="en" className={`${googleSans.variable} font-sans`} suppressHydrationWarning>
+      <body
+        className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-blue-100 selection:text-blue-900"
+        suppressHydrationWarning
+      >
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>

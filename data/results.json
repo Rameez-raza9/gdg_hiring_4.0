@@ -1,0 +1,5 @@
+[
+  { "email": "sample.accepted@example.com", "roll": "SV23001", "name": "Sample Accepted", "outcome": "Accepted", "team": "Architect", "role": "Web Development Lead", "no": 1 },
+  { "email": "sample.waitlist@example.com", "roll": "SV23002", "name": "Sample Waitlist", "outcome": "Waitlist" },
+  { "email": "sample.no@example.com", "roll": "SV23003", "name": "Sample Not Selected", "outcome": "Not selected" }
+]

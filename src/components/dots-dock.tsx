@@ -10,11 +10,11 @@ import {
   useSpring,
   useTransform,
 } from "motion/react";
-import { CircleHelp, House, LogIn, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { CircleHelp, House, LogIn, Sparkles, Trophy, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { G } from "@/components/dot";
 
-/* ---------- dock primitives (with context and magnification) ---------- */
+/* ---------- dock primitives (your magnification logic, now with context) ---------- */
 
 const DockContext = createContext<{
   mouseX: MotionValue<number>;
@@ -41,11 +41,12 @@ function Dock({
     <DockContext.Provider value={{ mouseX, size, magnification, distance }}>
       <motion.nav
         aria-label="Primary"
+        // clientX (not pageX) so it works inside a fixed container while scrolled
         onMouseMove={(e) => mouseX.set(e.clientX)}
         onMouseLeave={() => mouseX.set(Infinity)}
         className={cn(
-          "flex h-[64px] w-max items-end gap-2.5 rounded-3xl border border-slate-200/80 bg-white/90 px-3 pb-2.5 pt-2",
-          "shadow-[0_12px_36px_rgba(0,0,0,0.08)] backdrop-blur-xl",
+          "flex h-[64px] w-max items-end gap-2.5 rounded-3xl border border-border bg-card/70 px-3 pb-2.5 pt-2",
+          "shadow-[0_10px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
           className,
         )}
       >
@@ -121,8 +122,7 @@ function DockItem({
 /* ---------- the site dock ---------- */
 
 const ITEMS = [
-  { href: "/", label: "Home", color: G.blue, Icon: House },
-  { href: "/#team", label: "Team", color: G.yellow, Icon: Users },
+  { href: "/", label: "Results", color: "#A142F4", Icon: Trophy },
   { href: "/faq", label: "FAQ", color: G.green, Icon: CircleHelp },
   { href: "/apply", label: "Apply now", color: G.red, Icon: Sparkles },
   { href: "/login", label: "Login", color: "#eef1f8", Icon: LogIn },
@@ -138,7 +138,11 @@ export default function DotsDock() {
             <DockItem
               key={item.label}
               {...item}
-              active={pathname === item.href.split("#")[0] && !item.href.includes("#")}
+              active={
+                item.href === "/"
+                  ? pathname === "/" || pathname === "/results"
+                  : pathname === item.href
+              }
             />
           ))}
         </Dock>
